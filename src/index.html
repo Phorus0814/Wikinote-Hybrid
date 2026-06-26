@@ -1,0 +1,4677 @@
+<!DOCTYPE html>
+<html lang="ko" style="background-color: #1e1e1e;">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WikiNote Hybrid - Workspace IDE</title>
+  
+  <!-- [아이콘 호환성 패치] 실제 앱 타이틀 바 및 브라우저 탭 아이콘 갱신 전용 링크 선언 (캐시 버스팅 v=2 적용) -->
+  <link rel="shortcut icon" href="icon.ico?v=2" type="image/x-icon">
+  <link rel="icon" href="icon.ico?v=2" type="image/x-icon">
+
+  <!-- [에러 해결 패치] 이미지 로드 실패 시 실행될 에러 핸들러 선행 정의 -->
+  <script>
+    function handleLauncherIconError() {
+      const img = document.getElementById('launcher-app-icon');
+      const fallback = document.getElementById('launcher-fallback-icon');
+      if (img) img.style.display = 'none';
+      if (fallback) fallback.style.display = 'flex';
+    }
+    function handleMenuIconError() {
+      const img = document.getElementById('menu-app-icon');
+      const fallback = document.getElementById('menu-fallback-icon');
+      if (img) img.style.display = 'none';
+      if (fallback) fallback.style.display = 'flex';
+    }
+  </script>
+  
+  <style>
+    /* =============================================================
+       1. 전역 리셋 & 시스템 폰트
+       ============================================================= */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    html, body {
+      background-color: #1e1e1e !important;
+    }
+
+    /* 전역 커스텀 스크롤바 디자인 */
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e1e1e;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #424242;
+      border: 2px solid #1e1e1e;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #4f4f4f;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #1e1e1e;
+      color: #cbd5e1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* 드래그 상태일 때 트리 자식 요소들의 포인터 이벤트 일괄 정지 및 전역 커서 강제 지정 */
+    body.dragging-active {
+      cursor: grabbing !important;
+    }
+    
+    body.dragging-active .tree-row {
+      cursor: grabbing !important;
+    }
+
+    body.dragging-active .tree-row * {
+      pointer-events: none !important;
+    }
+
+    /* =============================================================
+       2. 프로젝트 런처 대시보드
+       ============================================================= */
+    #launcher-container {
+      position: absolute;
+      inset: 0;
+      background-color: #1e1e1e;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .launcher-dashboard {
+      width: 860px;
+      height: 560px;
+      background-color: #252526;
+      border: 1px solid #3e3e42;
+      border-radius: 8px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+      display: flex;
+      overflow: hidden;
+    }
+
+    .launcher-left-pane {
+      width: 380px;
+      background-color: #252526;
+      border-right: 1px solid #3e3e42;
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+    }
+
+    .launcher-brand-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    .launcher-logo {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
+      border-radius: 6px;
+      background-color: #2d2d30;
+      padding: 2px;
+    }
+
+    .launcher-logo-placeholder {
+      background-color: #0e639c;
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .launcher-brand-text {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .launcher-app-title {
+      font-size: 21px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+    }
+
+    .launcher-desc {
+      font-size: 13px;
+      color: #a0a0a0;
+      margin-bottom: 24px;
+    }
+
+    .launcher-actions-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .launcher-action-btn {
+      width: 100%;
+      background-color: #0e639c;
+      color: #ffffff;
+      border: none;
+      border-radius: 4px;
+      padding: 10px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .launcher-action-btn:hover {
+      background-color: #1177bb;
+    }
+
+    .launcher-action-btn.secondary {
+      background-color: #3e3e40;
+      border: 1px solid #555555;
+      color: #cccccc;
+    }
+
+    .launcher-action-btn.secondary:hover {
+      background-color: #4f4f52;
+      color: #ffffff;
+    }
+
+    .launcher-list-title {
+      font-size: 11px;
+      color: #858585;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      letter-spacing: 0.05em;
+    }
+
+    .launcher-project-scroll {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .launcher-project-item {
+      padding: 12px;
+      background-color: #1e1e1e;
+      border: 1px solid #2d2d30;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      transition: all 0.1s ease;
+    }
+
+    .launcher-project-item:hover {
+      background-color: #2a2a2b;
+      border-color: #424242;
+    }
+
+    .launcher-project-item.active-running {
+      border-left: 3px solid #0e639c;
+    }
+
+    .launcher-project-item.selected {
+      outline: 1.5px solid #0e639c;
+    }
+
+    .proj-item-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .proj-item-desc {
+      font-size: 10px;
+      color: #858585;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .launcher-right-pane {
+      flex: 1;
+      background-color: #1e1e1e;
+      display: flex;
+      flex-direction: column;
+      padding: 32px;
+      justify-content: center;
+    }
+
+    .launcher-empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #858585;
+      font-size: 12px;
+      gap: 16px;
+    }
+
+    .launcher-details-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .launcher-details-header {
+      font-size: 22px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 24px;
+      border-bottom: 1px solid #3e3e42;
+      padding-bottom: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .launcher-details-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      row-gap: 14px;
+      column-gap: 24px;
+      font-size: 12px;
+      color: #cccccc;
+      margin-bottom: auto;
+    }
+
+    .launcher-details-label {
+      color: #858585;
+      font-weight: 600;
+    }
+
+    .launcher-details-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 24px;
+    }
+
+    /* =============================================================
+       3. 메인 작업 공간 (클래식 메뉴 바)
+       ============================================================= */
+    #workspace-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+      visibility: hidden;
+    }
+
+    .classic-menu-bar {
+      height: 32px;
+      background-color: #2d2d30;
+      border-bottom: 1px solid #1e1e1e;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      font-size: 12px;
+      color: #cccccc;
+      gap: 2px;
+      position: relative;
+      z-index: 120;
+    }
+
+    .menu-bar-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-right: 4px;
+    }
+
+    .menu-logo {
+      width: 18px;
+      height: 18px;
+      object-fit: contain;
+      border-radius: 4px;
+    }
+
+    .menu-bar-logo-placeholder {
+      background-color: #0e639c;
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .menu-bar-title {
+      font-size: 11.5px;
+      font-weight: 800;
+      color: #52a9ff;
+    }
+
+    .menu-bar-separator {
+      width: 1px;
+      height: 12px;
+      background-color: #3e3e42;
+      margin: 0 6px;
+    }
+
+    .menu-item-container {
+      position: relative;
+      display: inline-block;
+    }
+
+    .menu-item-btn {
+      background: transparent;
+      border: none;
+      color: #cccccc;
+      padding: 4px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 11.5px;
+      outline: none;
+    }
+
+    .menu-item-btn:hover, .menu-item-container.active .menu-item-btn {
+      background-color: #3e3e40;
+      color: #ffffff;
+    }
+
+    .menu-dropdown {
+      position: absolute;
+      top: 28px;
+      left: 0;
+      background-color: #252526;
+      border: 1px solid #3e3e42;
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      z-index: 150;
+      display: none;
+      flex-direction: column;
+      padding: 4px 0;
+      min-width: 220px;
+    }
+
+    .menu-item-container.active .menu-dropdown {
+      display: flex;
+    }
+
+    .menu-dropdown-btn {
+      background: transparent;
+      border: none;
+      color: #cccccc;
+      padding: 6px 14px;
+      text-align: left;
+      font-size: 11px;
+      cursor: pointer;
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      outline: none;
+      align-items: center;
+    }
+
+    .menu-dropdown-btn:hover {
+      background-color: #0e639c;
+      color: #ffffff;
+    }
+
+    .menu-dropdown-btn .shortcut {
+      color: #858585;
+      font-size: 10px;
+    }
+
+    /* 캐스케이딩 플라이아웃 서브메뉴 */
+    .submenu-container {
+      position: relative;
+      width: 100%;
+    }
+
+    .menu-submenu {
+      position: absolute;
+      top: 0;
+      left: 100%;
+      background-color: #252526;
+      border: 1px solid #3e3e42;
+      border-radius: 4px;
+      box-shadow: 4px 4px 15px rgba(0,0,0,0.6);
+      display: none;
+      flex-direction: column;
+      padding: 4px 0;
+      min-width: 190px;
+      z-index: 160;
+    }
+
+    .submenu-container:hover .menu-submenu {
+      display: flex;
+    }
+
+    .dropdown-divider {
+      height: 1px;
+      background-color: #3e3e42;
+      margin: 4px 0;
+    }
+
+    .workspace-layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* 사이드바 레이아웃 */
+    .left-sidebar {
+      width: 260px;
+      background-color: #252526;
+      border-right: 1px solid #3e3e42;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .sidebar-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid #2d2d30;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 38px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #858585;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .add-node-btn {
+      background: transparent;
+      border: none;
+      color: #858585;
+      cursor: pointer;
+      font-size: 11px;
+    }
+
+    .add-node-btn:hover {
+      color: #ffffff;
+    }
+
+    .tree-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 0;
+      box-sizing: border-box;
+    }
+
+    /* =============================================================
+       트리 행 및 드래그 가이드 디자인
+       ============================================================= */
+    .tree-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 28px;
+      padding-right: 8px;
+      cursor: grab;
+      font-size: 12px;
+      color: #cccccc;
+      position: relative;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .tree-row:active {
+      cursor: grabbing;
+    }
+
+    .tree-row:hover {
+      background-color: #2a2a2b;
+    }
+
+    .tree-row.active {
+      background-color: #37373d;
+      color: #ffffff;
+    }
+
+    .tree-row.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background-color: #0e639c;
+    }
+
+    .tree-row.selected-node {
+      background-color: rgba(14, 99, 156, 0.12) !important;
+      outline: 1px solid rgba(14, 99, 156, 0.2) !important;
+      outline-offset: -1px;
+    }
+
+    .tree-row.drag-over-inside {
+      background-color: rgba(14, 99, 156, 0.25) !important;
+      outline: 1.5px solid #007acc !important;
+      outline-offset: -1.5px;
+    }
+
+    .tree-row.drag-over-before::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 12px;
+      right: 0;
+      height: 2px;
+      background-color: #007acc;
+      z-index: 100;
+    }
+
+    .tree-row.drag-over-before::after {
+      content: "";
+      position: absolute;
+      top: -3px;
+      left: 8px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #007acc;
+      border: 1px solid #1e1e1e;
+      z-index: 101;
+    }
+
+    .tree-row.drag-over-after::before {
+      content: "";
+      position: absolute;
+      bottom: 0;
+      left: 12px;
+      right: 0;
+      height: 2px;
+      background-color: #007acc;
+      z-index: 100;
+    }
+
+    .tree-row.drag-over-after::after {
+      content: "";
+      position: absolute;
+      bottom: -3px;
+      left: 8px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #007acc;
+      border: 1px solid #1e1e1e;
+      z-index: 101;
+    }
+
+    .node-content-wrap {
+      display: flex;
+      align-items: center;
+      flex: 1;
+      overflow: hidden;
+      height: 100%;
+    }
+
+    .indent-guide {
+      font-family: Consolas, Monaco, monospace;
+      color: #424242;
+      white-space: pre;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      flex-shrink: 0;
+      font-size: 11px;
+    }
+
+    .tree-caret {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      color: #858585;
+      flex-shrink: 0;
+      border-radius: 3px;
+      transition: background-color 0.1s ease, color 0.1s ease;
+      margin-right: 2px;
+    }
+
+    .tree-caret:hover {
+      background-color: #3e3e40;
+      color: #ffffff;
+    }
+
+    .tree-caret-spacer {
+      display: inline-block;
+      width: 18px;
+      margin-right: 2px;
+      flex-shrink: 0;
+    }
+
+    .node-label {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding-left: 2px;
+    }
+
+    .node-actions {
+      display: none;
+      gap: 4px;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    .tree-row:hover .node-actions {
+      display: flex;
+    }
+
+    .node-action-btn {
+      background: transparent;
+      border: none;
+      color: #858585;
+      cursor: pointer;
+      font-size: 12px;
+      width: 18px;
+      height: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      font-weight: bold;
+      transition: all 0.1s ease;
+    }
+
+    .node-action-btn:hover {
+      background-color: #3e3e40;
+      color: #ffffff;
+    }
+
+    .node-action-btn.delete-btn:hover {
+      background-color: #902020;
+      color: #ff9e9e;
+    }
+
+    /* 패널 조절 핸들 */
+    .resizer-handler {
+      width: 4px;
+      background-color: #3e3e42;
+      cursor: col-resize;
+      z-index: 50;
+      transition: background-color 0.15s ease;
+    }
+
+    .resizer-handler:hover, .resizer-handler.dragging {
+      background-color: #0e639c;
+    }
+
+    /* =============================================================
+       4. 마크다운 에디터 & 오버레이 (정밀 픽셀 대칭 싱크 설계)
+       ============================================================= */
+    .center-canvas {
+      flex: 1;
+      background-color: #1e1e1e;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .formatting-toolbar {
+      height: 38px;
+      background-color: #2d2d30;
+      border-bottom: 1px solid #252526;
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 14px;
+    }
+
+    .toolbar-label {
+      font-size: 11px;
+      color: #858585;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .toolbar-select {
+      background-color: #3c3c3c;
+      border: 1px solid #555555;
+      color: #cccccc;
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 3px;
+      outline: none;
+    }
+
+    .toolbar-num-input {
+      background-color: #3c3c3c;
+      border: 1px solid #555555;
+      color: #cccccc;
+      font-size: 11px;
+      padding: 2px 4px;
+      border-radius: 3px;
+      width: 50px;
+      outline: none;
+    }
+
+    /* 인터랙티브 상위 가상 경로 브레드크럼 바 스타일 */
+    .breadcrumbs-interactive-bar {
+      background-color: #202021;
+      border-bottom: 1px solid #2d2d30;
+      padding: 8px 20px;
+      font-size: 11.5px;
+      font-family: Consolas, Monaco, monospace;
+      color: #858585;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+      user-select: none;
+    }
+
+    .breadcrumb-segment {
+      color: #858585;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 3px;
+      transition: background-color 0.1s ease, color 0.1s ease;
+      font-weight: 500;
+    }
+
+    .breadcrumb-segment:hover {
+      background-color: #2d2d30;
+      color: #52a9ff;
+    }
+
+    .breadcrumb-separator {
+      color: #444446;
+      font-weight: bold;
+    }
+
+    .breadcrumb-active {
+      color: #e2e8f0;
+      font-weight: 700;
+      padding: 2px 6px;
+    }
+
+    /* 넘어옴 표시 스타일 - 불필요한 색상 강조를 배제한 차분한 무채색조 피팅 */
+    .breadcrumb-history {
+      color: #858585;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 3px;
+      transition: background-color 0.1s ease, color 0.1s ease;
+      font-weight: normal;
+    }
+
+    .breadcrumb-history:hover {
+      background-color: #2d2d30;
+      color: #cccccc;
+    }
+
+    .editor-header-input {
+      background-color: #1e1e1e;
+      border: none;
+      outline: none;
+      color: #ffffff;
+      font-size: 20px;
+      font-weight: 700;
+      padding: 16px 20px 12px 20px;
+      width: 100%;
+      border-bottom: 1px solid #2d2d30;
+    }
+
+    /* 상위 컨테이너 */
+    .editor-container {
+      position: relative;
+      flex: 1;
+      width: 100%;
+      background-color: #1e1e1e;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    /* 1:1 대칭 패널 매칭 보정 완료 (안전 마진 0픽셀) */
+    .editor-textarea, .editor-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100% !important;
+      margin: 0 !important;
+      padding: 20px 20px 80vh 20px !important;
+      border: none !important;
+      outline: none !important;
+      box-sizing: border-box !important;
+      
+      /* 타이포그래피 가이드라인 */
+      font-size: 14px !important;
+      line-height: 1.625 !important;
+      font-family: Consolas, Monaco, "Courier New", monospace !important;
+      letter-spacing: normal !important;
+      word-spacing: normal !important;
+      text-align: left !important;
+      text-transform: none !important;
+      text-indent: 0px !important;
+      white-space: pre-wrap !important;
+      word-break: break-all !important;
+      overflow-wrap: break-word !important;
+      
+      /* 브라우저별 특수 미세 간격 변주 방지 */
+      font-variant-ligatures: none !important;
+      -webkit-font-variant-ligatures: none !important;
+      font-feature-settings: "liga" 0 !important;
+      
+      /* 가속 렌더링 강제 통일 */
+      text-rendering: optimizeSpeed !important;
+      -webkit-font-smoothing: antialiased !important;
+      -moz-osx-font-smoothing: grayscale !important;
+    }
+
+    .editor-textarea {
+      background: transparent !important;
+      color: transparent !important;
+      -webkit-text-fill-color: transparent !important;
+      caret-color: #ffffff !important;
+      z-index: 2;
+      resize: none !important;
+      overflow: hidden !important;
+    }
+
+    .editor-overlay {
+      color: #cbd5e1;
+      z-index: 1;
+      pointer-events: none;
+      background-color: #1e1e1e;
+      overflow: hidden !important;
+    }
+
+    .code-link-valid { color: #52a9ff !important; text-decoration: underline; cursor: pointer; }
+    .code-link-self { color: #ff9800 !important; border-bottom: 1.5px dashed #ff9800; }
+    .code-link-broken { color: #ff9800 !important; text-decoration: line-through; }
+
+    /* =============================================================
+       5. 상태 바 & 모달 & 토스트 & 단축키 스타일
+       ============================================================= */
+    .bottom-status-bar {
+      height: 22px;
+      background-color: #007acc;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      font-size: 11px;
+    }
+
+    .status-indicator-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #10b981;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .custom-modal {
+      position: fixed;
+      inset: 0;
+      background-color: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+    }
+
+    .custom-modal.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-content {
+      width: 480px;
+      background-color: #252526;
+      border: 1px solid #3e3e42;
+      border-radius: 6px;
+      padding: 20px;
+      position: relative;
+    }
+
+    /* 모달 헤더 리스타일 및 닫기 버튼 레이아웃 */
+    .modal-header-wrap {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      border-bottom: 1px solid #2d2d30;
+      padding-bottom: 8px;
+    }
+
+    .modal-close-x-btn {
+      background: transparent;
+      border: none;
+      color: #858585;
+      font-size: 18px;
+      font-weight: 700;
+      cursor: pointer;
+      line-height: 1;
+      transition: color 0.1s ease;
+      outline: none;
+    }
+
+    .modal-close-x-btn:hover {
+      color: #ffffff;
+    }
+
+    .modal-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .modal-msg {
+      font-size: 12px;
+      color: #cccccc;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+
+    .modal-input {
+      width: 100%;
+      background-color: #3c3c3c;
+      border: 1px solid #555555;
+      border-radius: 4px;
+      color: #ffffff;
+      padding: 8px;
+      font-size: 12px;
+      margin-bottom: 16px;
+      outline: none;
+    }
+
+    .modal-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .modal-btn {
+      padding: 6px 14px;
+      border-radius: 4px;
+      font-size: 12px;
+      cursor: pointer;
+      border: none;
+    }
+
+    .modal-btn.primary { background-color: #0e639c; color: #ffffff; }
+    .modal-btn.secondary { background-color: #3c3c3c; color: #cccccc; }
+
+    #toast-notice {
+      position: fixed;
+      bottom: 32px;
+      right: 24px;
+      background-color: #252526;
+      border: 1px solid #3e3e42;
+      border-radius: 4px;
+      padding: 12px 18px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+      z-index: 300;
+      display: flex;
+      align-items: center;
+      font-size: 12px;
+      color: #ffffff;
+      transform: translateY(100px);
+      opacity: 0;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+
+    #toast-notice.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .shortcut-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 10px 0;
+      font-size: 11.5px;
+    }
+    .shortcut-table th, .shortcut-table td {
+      padding: 6px 10px;
+      text-align: left;
+      border-bottom: 1px solid #333337;
+    }
+    .shortcut-table th {
+      color: #858585;
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 10px;
+      letter-spacing: 0.05em;
+    }
+    .shortcut-table td {
+      color: #cccccc;
+    }
+    .shortcut-key {
+      background-color: #37373d;
+      border: 1px solid #555555;
+      border-bottom: 2px solid #555555;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: Consolas, monospace;
+      color: #ffffff;
+      font-size: 10px;
+    }
+
+    .quick-pick-item {
+      padding: 8px 12px;
+      background-color: #1e1e1e;
+      border: 1px solid #2d2d30;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #cccccc;
+      transition: all 0.1s ease;
+      margin-bottom: 4px;
+    }
+    .quick-pick-item:hover, .quick-pick-item.selected {
+      background-color: #0e639c;
+      color: #ffffff;
+      border-color: #1177bb;
+    }
+
+    /* 33종 고대비 프리미엄 컬러 퀵 픽 그리드 */
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .color-pick-card {
+      background-color: #1e1e1e;
+      border: 1px solid #3e3e42;
+      border-radius: 4px;
+      padding: 10px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.12s ease;
+    }
+    .color-pick-card:hover, .color-pick-card.focused {
+      border-color: #0e639c;
+      background-color: #2d2d30;
+    }
+    .color-pick-indicator {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+    }
+    .color-pick-text {
+      font-size: 11px;
+      color: #cccccc;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+      text-align: center;
+    }
+    .color-pick-badge {
+      font-size: 9px;
+      color: #858585;
+      background-color: #333337;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+
+    /* 커스텀 마우스 우클릭 컨텍스트 메뉴 스타일 */
+    .custom-context-menu {
+      position: absolute;
+      background-color: #252526;
+      border: 1px solid #3e3e42;
+      border-radius: 4px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+      z-index: 1000;
+      display: none;
+      flex-direction: column;
+      padding: 4px 0;
+      min-width: 170px;
+    }
+
+    .context-menu-btn {
+      background: transparent;
+      border: none;
+      color: #cccccc;
+      padding: 7px 14px;
+      text-align: left;
+      font-size: 11.5px;
+      cursor: pointer;
+      width: 100%;
+      display: block;
+      outline: none;
+    }
+
+    .context-menu-btn:hover {
+      background-color: #3e3e40;
+      color: #ffffff;
+    }
+
+    .context-menu-btn:disabled {
+      color: #555555 !important;
+      cursor: not-allowed;
+      background: transparent !important;
+    }
+
+    /* [역링크 한 줄 제한 스타일] */
+    .backlink-context-line {
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      display: block !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+  </style>
+  <!-- JSZip 엔진 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body onclick="closeAllDropdowns(); hideContextMenu();">
+
+  <!-- 사이드바 우클릭 통합 단순형 컨텍스트 메뉴 -->
+  <nav id="tree-context-menu" class="custom-context-menu">
+    <button id="context-add-btn" onclick="contextAddSubDoc()" class="context-menu-btn">하위 문서 추가</button>
+    <button id="context-delete-btn" onclick="contextDeleteDoc()" class="context-menu-btn">문서 삭제</button>
+    <div id="context-divider-1" class="dropdown-divider"></div>
+    <button id="context-backlinks-btn" onclick="contextViewBacklinks()" class="context-menu-btn">역링크 보기</button>
+    <div id="context-divider-2" class="dropdown-divider"></div>
+    <button id="context-cut-btn" onclick="contextCutDoc()" class="context-menu-btn">잘라내기</button>
+    <button id="context-copy-btn" onclick="contextCopyDoc()" class="context-menu-btn">복사</button>
+    <button id="context-paste-btn" onclick="contextPasteDoc()" class="context-menu-btn">붙여넣기</button>
+  </nav>
+
+  <!-- 런처 화면 -->
+  <section id="launcher-container">
+    <div class="launcher-dashboard">
+      <div class="launcher-left-pane">
+        <div class="launcher-brand-header">
+          <img src="icon.ico?v=2" class="launcher-logo" alt="Logo" id="launcher-app-icon" onerror="handleLauncherIconError()">
+          <div id="launcher-fallback-icon" class="launcher-logo-placeholder" style="display: none;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"></path>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+            </svg>
+          </div>
+          <span class="launcher-app-title">Wikinote Hybrid</span>
+        </div>
+        <p class="launcher-desc">깔끔한 위키형 메모장</p>
+        <div class="launcher-actions-group">
+          <button onclick="createNewProjectFromLauncher()" class="launcher-action-btn">+ 새 프로젝트 만들기</button>
+          <button onclick="triggerProjectImport()" class="launcher-action-btn secondary">가져오기</button>
+        </div>
+        <div class="launcher-list-title">내 프로젝트 목록</div>
+        <div id="launcher-project-scroll-box" class="launcher-project-scroll"></div>
+      </div>
+      <div id="launcher-inspector-pane" class="launcher-right-pane">
+        <div class="launcher-empty-state">
+          <span>목록에서 프로젝트를 선택해 주세요.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 메인 작업 공간 -->
+  <section id="workspace-container">
+    <nav class="classic-menu-bar">
+      <div class="menu-bar-brand">
+        <img src="icon.ico?v=2" class="menu-logo" alt="Logo" id="menu-app-icon" onerror="handleMenuIconError()">
+        <div id="menu-fallback-icon" class="menu-bar-logo-placeholder" style="display: none;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+        </div>
+        <span class="menu-bar-title">Wikinote Hybrid</span>
+      </div>
+      <div class="menu-bar-separator"></div>
+
+      <!-- 파일(F) -->
+      <div class="menu-item-container">
+        <button class="menu-item-btn" onclick="toggleMenuDropdown(event, 'menu-file')">파일(F)</button>
+        <div id="menu-file" class="menu-dropdown">
+          <button onclick="createNewDocumentNode()" class="menu-dropdown-btn">새 하위 문서 <span class="shortcut">Ctrl+N</span></button>
+          <button onclick="manualBackupTrigger()" class="menu-dropdown-btn">저장 <span class="shortcut">Ctrl+S</span></button>
+          
+          <div class="submenu-container">
+            <button class="menu-dropdown-btn" onclick="event.stopPropagation()">내보내기 <span class="shortcut">▶</span></button>
+            <div class="menu-submenu">
+              <button onclick="exportProjectToZip()" class="menu-dropdown-btn">ZIP 파일로 내보내기</button>
+              <button onclick="exportProjectTo7z()" class="menu-dropdown-btn">7z 파일로 내보내기</button>
+              <button onclick="exportProjectToFolder()" class="menu-dropdown-btn">폴더로 내보내기</button>
+              <button onclick="exportProjectToFolder()" class="menu-dropdown-btn">기존 폴더에 내보내기</button>
+              <button onclick="exportUnifiedOnly()" class="menu-dropdown-btn">통합파일만 내보내기</button>
+            </div>
+          </div>
+          
+          <div class="dropdown-divider"></div>
+          <button onclick="goBackToLauncher()" class="menu-dropdown-btn">닫기</button>
+        </div>
+      </div>
+
+      <!-- 편집(E) -->
+      <div class="menu-item-container">
+        <button class="menu-item-btn" onclick="toggleMenuDropdown(event, 'menu-edit')">편집(E)</button>
+        <div id="menu-edit" class="menu-dropdown">
+          <button onclick="document.execCommand('undo')" class="menu-dropdown-btn">실행 취소 <span class="shortcut">Ctrl+Z</span></button>
+          <button onclick="document.execCommand('redo')" class="menu-dropdown-btn">다시 실행 <span class="shortcut">Ctrl+Y</span></button>
+        </div>
+      </div>
+
+      <!-- 프로젝트(P) -->
+      <div class="menu-item-container">
+        <button class="menu-item-btn" onclick="toggleMenuDropdown(event, 'menu-project')">프로젝트(P)</button>
+        <div id="menu-project" class="menu-dropdown">
+          <button onclick="createNewProjectFromLauncher()" class="menu-dropdown-btn">새 프로젝트 만들기</button>
+          <button onclick="triggerProjectImport()" class="menu-dropdown-btn">가져오기</button>
+        </div>
+      </div>
+
+      <!-- 보기(V) -->
+      <div class="menu-item-container">
+        <button class="menu-item-btn" onclick="toggleMenuDropdown(event, 'menu-view')">보기(V)</button>
+        <div id="menu-view" class="menu-dropdown">
+          <button onclick="togglePanel('left')" class="menu-dropdown-btn">워크스페이스 토글 <span class="shortcut">Ctrl+B</span></button>
+          <button onclick="showBacklinksModal()" class="menu-dropdown-btn">역링크 보기 <span class="shortcut">Alt+B</span></button>
+          <div class="dropdown-divider"></div>
+          <button onclick="toggleMetaOption('backlinks')" class="menu-dropdown-btn" id="menu-opt-backlinks">✓ 역링크 표시</button>
+          <div class="dropdown-divider"></div>
+          <button onclick="toggleSpellcheck()" class="menu-dropdown-btn" id="menu-view-spellcheck">✓ 맞춤법 검사 활성화</button>
+        </div>
+      </div>
+
+      <!-- 도움말(H) -->
+      <div class="menu-item-container">
+        <button class="menu-item-btn" onclick="toggleMenuDropdown(event, 'menu-help')">도움말(H)</button>
+        <div id="menu-help" class="menu-dropdown">
+          <button onclick="showShortcutModal()" class="menu-dropdown-btn">단축키 안내 <span class="shortcut">F1</span></button>
+          <div class="dropdown-divider"></div>
+          <button onclick="showAboutModal()" class="menu-dropdown-btn">WNH 정보</button>
+        </div>
+      </div>
+    </nav>
+
+    <div class="workspace-layout">
+      <!-- 왼쪽 워크스페이스 트리 전용 영역 -->
+      <aside class="left-sidebar" id="panel-left">
+        <div class="sidebar-header">
+          <span class="sidebar-title">워크스페이스</span>
+          <button onclick="createNewDocumentNode()" class="add-node-btn" title="활성 문서의 하위 새 문서">+ 새 문서</button>
+        </div>
+        <div id="tree-container" class="tree-container"></div>
+      </aside>
+
+      <div class="resizer-handler" id="resizer-left"></div>
+
+      <!-- 메인 편집기 -->
+      <main class="center-canvas">
+        <div class="formatting-toolbar">
+          <span class="toolbar-label">글꼴</span>
+          <select id="pref-font-family" class="toolbar-select" onchange="applyTextPreferences()">
+            <option value="Consolas, Monaco, 'Courier New', monospace" selected>Consolas</option>
+            <option value="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif">시스템 기본 (System)</option>
+            <option value="'Malgun Gothic', '맑은 고딕', sans-serif">맑은 고딕 (Malgun Gothic)</option>
+            <option value="Batang, '바탕', '바탕체', serif">바탕체 (Batang)</option>
+            <option value="Dotum, '돋움', sans-serif">돋움 (Dotum)</option>
+            <option value="Gungsuh, '궁서', '궁서체', serif">궁서체 (Gungsuh)</option>
+          </select>
+          <input type="number" id="pref-font-size" class="toolbar-num-input" value="14" min="8" max="72" oninput="applyTextPreferences()">
+          
+          <!-- 문서 복사 도구 버튼 -->
+          <button onclick="copyDocumentToClipboard()" class="toolbar-select" style="background-color: #3e3e40; color: #cccccc; cursor: pointer; border: 1px solid #555555; padding: 4px 12px; margin-left: auto; border-radius: 3px; font-size: 11px;">문서 복사</button>
+        </div>
+
+        <!-- 넘어옴 표시 최선두 자동 축소 브레드크럼 바 -->
+        <div id="editor-breadcrumbs-bar" class="breadcrumbs-interactive-bar">
+          <!-- 동적으로 분할 조각들이 렌더링됩니다. -->
+        </div>
+
+        <input type="text" id="document-title-input" class="editor-header-input" placeholder="제목 없는 문서" oninput="saveCurrentDocTitle()">
+        
+        <div class="editor-container" id="editor-container-box">
+          <div id="editor-highlight-overlay" class="editor-overlay"></div>
+          <textarea id="document-editor" class="editor-textarea" placeholder="텍스트를 자유롭게 입력하여 나만의 마크다운 위키 노트를 작성해 보세요." oninput="handleEditorRealtimeInput(event)"></textarea>
+        </div>
+      </main>
+    </div>
+
+    <footer class="bottom-status-bar">
+      <div>
+        <span class="status-indicator-dot"></span>
+        <span id="status-running-text">Local DB Connected</span>
+      </div>
+      <div style="font-family: monospace;">WNH System v2.6.2</div>
+    </footer>
+  </section>
+
+  <!-- 다이얼로그 모달 -->
+  <div id="modal-backdrop" class="custom-modal">
+    <div class="modal-content">
+      <div class="modal-title" id="modal-header-text">안내</div>
+      <p class="modal-msg" id="custom-modal-msg">내용</p>
+      <input type="text" id="custom-modal-input" class="modal-input" style="display: none;">
+      <div class="modal-buttons">
+        <button id="modal-cancel-btn" class="modal-btn secondary">취소</button>
+        <button id="modal-ok-btn" class="modal-btn primary">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 위키 링크 삽입 모달 -->
+  <div id="quick-link-backdrop" class="custom-modal" onclick="if(event.target===this) closeQuickLinkModal()">
+    <div class="modal-content" style="width: 500px; max-height: 400px; display: flex; flex-direction: column; padding: 15px;">
+      <div class="modal-header-wrap">
+        <span class="modal-title">위키 링크 바로 삽입</span>
+        <button onclick="closeQuickLinkModal()" class="modal-close-x-btn">×</button>
+      </div>
+      <input type="text" id="quick-link-search" class="modal-input" placeholder="문서 제목 또는 번호 검색..." style="margin-bottom: 10px;" oninput="filterQuickLinks()">
+      <div id="quick-link-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; max-height: 220px; padding-right: 4px;">
+        <!-- 문서 목록 동적 주입 영역 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 33종 고대비 프리미엄 컬러 퀵 픽 팝업창 -->
+  <div id="color-palette-backdrop" class="custom-modal" onclick="if(event.target===this) closeColorPaletteModal()">
+    <div class="modal-content" style="width: 560px; padding: 18px; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header-wrap">
+        <span class="modal-title">텍스트 강조 컬러 퀵 픽</span>
+        <button onclick="closeColorPaletteModal()" class="modal-close-x-btn">×</button>
+      </div>
+      <div class="color-grid" id="color-palette-grid" style="flex: 1; overflow-y: auto; padding-right: 4px; max-height: 520px;">
+        <!-- 33색 리스트 동적 렌더링 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 현재 문서 역링크 목록 조회 모달 -->
+  <div id="backlinks-backdrop" class="custom-modal" onclick="if(event.target===this) closeBacklinksModal()">
+    <div class="modal-content" style="width: 520px; max-height: 500px; display: flex; flex-direction: column; padding: 18px;">
+      <div class="modal-header-wrap">
+        <span id="backlinks-modal-title" class="modal-title">현재 문서 역링크 목록</span>
+        <button onclick="closeBacklinksModal()" class="modal-close-x-btn">×</button>
+      </div>
+      <div id="backlinks-list" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; max-height: 380px; padding-right: 4px;">
+        <!-- 역링크 문맥 분석 결과 동적 삽입 영역 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 병합 대상 파일 업로드용 인풋 -->
+  <input type="file" id="merge-file-input" style="display: none;" accept=".txt,.md" onchange="processFileMerge(this)">
+  
+  <!-- ZIP, 7z, 통합본 TXT 통합 가져오기 전용 인풋 -->
+  <input type="file" id="project-import-file-input" style="display: none;" accept=".zip,.7z,.txt" onchange="handleProjectImport(this)">
+
+  <script>
+    // =============================================================
+    // ⚙️ 데이터베이스 정의: com.wikinote.hybrid (IndexedDB 기반 통합 엔진)
+    // =============================================================
+    const DB_NAME = "com.wikinote.hybrid";
+    const DB_VERSION = 1;
+    const STORE_NAME = "workspace_data";
+    const LEGACY_STORAGE_KEY = "wnh_shortcut_v2";
+
+    let dbInstance = null;
+
+    // 33종 핵심 컬러 맵팅 데이터 정의
+    const colorMap = {
+      'r': { name: 'Red', hex: '#ff3b30' },
+      'g': { name: 'Green', hex: '#34c759' },
+      'b': { name: 'Blue', hex: '#007aff' },
+      'y': { name: 'Yellow', hex: '#ffcc00' },
+      'p': { name: 'Purple', hex: '#af52de' },
+      'o': { name: 'Orange', hex: '#ff9500' },
+      'c': { name: 'Cyan', hex: '#00c7e6' },
+      'm': { name: 'Magenta', hex: '#ff2d55' },
+      'w': { name: 'White', hex: '#ffffff' },
+      'l': { name: 'Lime', hex: '#87dd1c' },
+      'k': { name: 'Pink', hex: '#ff1493' },
+      'a': { name: 'Aqua', hex: '#00a896' },
+      'e': { name: 'Emerald', hex: '#10b981' },
+      't': { name: 'Turquoise', hex: '#008080' },
+      'i': { name: 'Indigo', hex: '#5856d6' },
+      'v': { name: 'Violet', hex: '#8a2be2' },
+      'd': { name: 'Gold', hex: '#d4af37' },
+      's': { name: 'Silver', hex: '#a0a0a0' },
+      'f': { name: 'Forest', hex: '#228b22' },
+      'h': { name: 'Crimson', hex: '#dc143c' },
+      'n': { name: 'Brown', hex: '#8b4513' },
+      'u': { name: 'Amber', hex: '#ffbf00' },
+      'x': { name: 'Coral', hex: '#e056fd' },
+      'z': { name: 'Bronze', hex: '#cd7f32' },
+
+      '1': { name: 'Ruby', hex: '#b30000' },
+      '2': { name: 'Mint', hex: '#00ff66' },
+      '3': { name: 'Navy', hex: '#1e3799' },
+      '4': { name: 'Lemon', hex: '#ffa801' },
+      '5': { name: 'Plum', hex: '#8c11aa' },
+      '6': { name: 'Rust', hex: '#b33939' },
+      '7': { name: 'Teal', hex: '#0a3d62' },
+      '8': { name: 'Burgundy', hex: '#821111' },
+      '9': { name: 'Sky', hex: '#0fbcf9' }
+    };
+
+    let appState = {
+      projects: {},
+      activeProjectId: "",
+      draggedNodeId: null,
+      descendantsBlacklist: null,
+      dropPos: null,
+      spellcheckActive: false,
+      showTopBacklinks: true,
+      navigatedFromDocId: null,
+      // [Case 1] 문서별 정밀 마지막 스크롤 영역 캐시 저장 필드 선언
+      scrollPositions: {}
+    };
+
+    let dragInfo = {
+      isDragging: false,
+      sourceId: null,
+      targetId: null,
+      startX: 0,
+      startY: 0
+    };
+
+    let uuidToMetaMap = new Map();
+    let indexToUuidMap = new Map();
+    let launcherSelectedProjectId = "";
+    let selectedQuickPickIndex = 0;
+    let isComposing = false;
+    let selectionBackup = { start: 0, end: 0 };
+    
+    // 동일 위상 다중 선택 노드 ID 목록
+    let selectedNodeIds = [];
+
+    // 우클릭 컨텍스트 메뉴 타겟 문서 임시 저장소 및 복사/잘라내기 클립보드 객체
+    let contextMenuTargetId = null;
+    let clipboardNode = null; // { action: 'copy'|'cut', data: subtreeData|null, sourceDocId: string, sourceProjId: string }
+
+    window.onload = async function() {
+      await initIndexedDB();
+      await loadDatabaseState();
+      rebuildIndexMaps();
+      initShortcuts();
+      initResizerPanel();
+      renderProjectLauncher();
+      renderColorPaletteGrid();
+      applySpellcheckState();
+      adjustTreeContainerPadding();
+
+      const editor = document.getElementById("document-editor");
+      if (editor) {
+        editor.addEventListener("dblclick", handleEditorDblClick);
+        editor.addEventListener("keydown", handleEditorKeyDown);
+        editor.addEventListener("keyup", handleEditorRealtimeInput);
+        // [Case 1 개선] 단순 마우스 클릭 및 포커스 시 높이 계산 및 캐럿 추적으로 스크롤이 요동치는 불합리를 원천 제거
+        editor.addEventListener("compositionstart", () => { isComposing = true; });
+        editor.addEventListener("compositionend", () => { isComposing = false; handleEditorRealtimeInput(); });
+      }
+
+      window.addEventListener('resize', () => {
+        syncEditorHeight();
+        adjustTreeContainerPadding();
+      });
+
+      window.addEventListener("dragstart", function(e) {
+        if (dragInfo.isDragging) {
+          e.preventDefault();
+        }
+      });
+
+      document.addEventListener("click", function(e) {
+        if (!e.target.closest(".tree-row") && 
+            !e.target.closest(".node-action-btn") && 
+            !e.target.closest(".tree-caret") &&
+            !e.target.closest(".menu-dropdown") &&
+            !e.target.closest(".custom-modal") &&
+            !e.target.closest(".menu-item-btn") &&
+            !e.target.closest(".formatting-toolbar") &&
+            !e.target.closest(".launcher-dashboard")) {
+          selectedNodeIds = [];
+          renderTree();
+        }
+      });
+
+      // 사이드바 빈 곳 우클릭을 감지하기 위한 리스너 등록
+      const treeContainer = document.getElementById("tree-container");
+      if (treeContainer) {
+        treeContainer.addEventListener("contextmenu", (e) => {
+          if (e.target.closest(".tree-row")) return; 
+          e.preventDefault();
+          e.stopPropagation();
+          showEmptySpaceContextMenu(e);
+        });
+      }
+
+      // [컨트롤 + 마우스 휠 문서 빠른 이동 시스템]
+      window.addEventListener('wheel', function(e) {
+        if (e.ctrlKey) {
+          const workspace = document.getElementById("workspace-container");
+          if (!workspace || workspace.style.visibility !== "visible") return;
+
+          e.preventDefault(); 
+
+          const proj = appState.projects[appState.activeProjectId];
+          if (!proj) return;
+
+          const sortedList = getSortedDocumentsList();
+          if (sortedList.length <= 1) return;
+
+          const currentIndex = sortedList.findIndex(item => item.id === proj.activeDocId);
+          if (currentIndex === -1) return;
+
+          let targetIndex = currentIndex;
+          if (e.deltaY < 0) {
+            if (currentIndex > 0) {
+              targetIndex = currentIndex - 1;
+            }
+          } else if (e.deltaY > 0) {
+            if (currentIndex < sortedList.length - 1) {
+              targetIndex = currentIndex + 1;
+            }
+          }
+
+          if (targetIndex !== currentIndex) {
+            const targetDoc = sortedList[targetIndex];
+            selectDocument(targetDoc.id);
+            showToast(`문서 이동: ${targetDoc.index}. ${targetDoc.title}`);
+          }
+        }
+      }, { passive: false }); 
+    };
+
+    // IndexedDB 연결
+    function initIndexedDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onerror = (e) => {
+          console.error("IndexedDB Open Fail:", e);
+          reject(e);
+        };
+        request.onsuccess = (e) => {
+          dbInstance = e.target.result;
+          resolve(dbInstance);
+        };
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+          }
+        };
+      });
+    }
+
+    // 로컬 데이터 상태 복구
+    async function loadDatabaseState() {
+      try {
+        const data = await getDbValue("app_state");
+        if (data && data.projects && Object.keys(data.projects).length > 0) {
+          appState = data;
+          if (appState.showTopBacklinks === undefined) appState.showTopBacklinks = true;
+          // [Case 1] 스크롤 포지션 필드 초기화 확인 보장
+          if (!appState.scrollPositions) appState.scrollPositions = {};
+          return;
+        }
+      } catch (e) {
+        console.warn("IndexedDB Read Error, trying fallback:", e);
+      }
+
+      const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (legacy) {
+        try {
+          const parsed = JSON.parse(legacy);
+          if (parsed && parsed.projects && Object.keys(parsed.projects).length > 0) {
+            appState = parsed;
+            if (appState.showTopBacklinks === undefined) appState.showTopBacklinks = true;
+            if (!appState.scrollPositions) appState.scrollPositions = {};
+            await saveStateToCache();
+            return;
+          }
+        } catch (e) { console.warn(e); }
+      }
+
+      initializeDefaultState();
+    }
+
+    function getDbValue(key) {
+      return new Promise((resolve, reject) => {
+        if (!dbInstance) return reject("DB Not Initialized");
+        const transaction = dbInstance.transaction([STORE_NAME], "readonly");
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(key);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = (e) => reject(e);
+      });
+    }
+
+    function setDbValue(key, value) {
+      return new Promise((resolve, reject) => {
+        if (!dbInstance) return reject("DB Not Initialized");
+        const transaction = dbInstance.transaction([STORE_NAME], "readwrite");
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.put(value, key);
+        request.onsuccess = () => resolve();
+        request.onerror = (e) => reject(e);
+      });
+    }
+
+    // 기획서 구조기반 정렬 리스트 헬퍼
+    function getSortedDocumentsList() {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return [];
+      
+      const list = [];
+      
+      function recurse(docId) {
+        const doc = proj.documents[docId];
+        if (!doc) return;
+        const meta = uuidToMetaMap.get(docId) || { index: "0", title: doc.title };
+        list.push({
+          id: docId,
+          index: meta.index,
+          title: doc.title,
+          content: doc.content || ""
+        });
+        if (doc.childIds) {
+          doc.childIds.forEach(cId => recurse(cId));
+        }
+      }
+      
+      recurse("doc-root");
+      return list;
+    }
+
+    // 통합 단일 텍스트(통합본.txt) 생성 로직
+    function generateUnifiedText() {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return "";
+      
+      let text = `========================================\n`;
+      text += `  [통합본] ${proj.name} 기획 문서 목록\n`;
+      text += `========================================\n\n`;
+
+      const sorted = getSortedDocumentsList();
+      sorted.forEach(item => {
+        text += `${item.index}. ${item.title}\n`;
+        text += `----------------------------------------\n`;
+        text += `${item.content || ""}\n`;
+        text += `\n\n`;
+      });
+      return text;
+    }
+
+    // 다른 이름으로 저장 대화상자 강제 호출 엔진
+    async function saveFileWithPicker(blob, defaultSuggestedName) {
+      if (window.showSaveFilePicker) {
+        try {
+          const ext = defaultSuggestedName.split('.').pop();
+          const options = {
+            suggestedName: defaultSuggestedName,
+            types: []
+          };
+          
+          if (ext === 'zip') {
+            options.types.push({ description: 'ZIP 압축 보관함', accept: { 'application/zip': ['.zip'] } });
+          } else if (ext === '7z') {
+            options.types.push({ description: '7z 압축 파일', accept: { 'application/x-7z-compressed': ['.7z'] } });
+          } else if (ext === 'txt') {
+            options.types.push({ description: '텍스트 파일', accept: { 'text/plain': ['.txt'] } });
+          }
+
+          const fileHandle = await window.showSaveFilePicker(options);
+          const writable = await fileHandle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          showToast("저장 완료되었습니다.");
+        } catch (err) {
+          console.warn("File Picker Canceled or Failed:", err);
+          if (err.name !== 'AbortError') {
+            triggerDirectDownload(blob, defaultSuggestedName);
+          } else {
+            showToast("파일 저장이 취소되었습니다.");
+          }
+        }
+      } else {
+        triggerDirectDownload(blob, defaultSuggestedName);
+      }
+    }
+
+    function triggerDirectDownload(blob, filename) {
+      const element = document.createElement('a');
+      element.href = URL.createObjectURL(blob);
+      element.download = filename;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+    }
+
+    // 다양화된 내보내기 핵심 기능군
+    async function exportProjectToZip() {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      
+      rebuildIndexMaps();
+      showToast("ZIP 압축 패키징 파일 구성 중...");
+
+      if (typeof JSZip === 'undefined') {
+        showToast("ZIP 압축 라이브러리가 로드되지 않았습니다.");
+        return;
+      }
+
+      const zip = new JSZip();
+      const cleanProjName = proj.name.replace(/[/\\?%*:|"<>\n\r]/g, "_");
+      const folder = zip.folder(cleanProjName);
+      
+      const sorted = getSortedDocumentsList();
+      sorted.forEach(item => {
+        const fileName = `${item.index}. ${item.title}.md`.replace(/[/\\?%*:|"<>\n\r]/g, "_");
+        folder.file(fileName, item.content || "");
+      });
+
+      const unifiedText = generateUnifiedText();
+      const unifiedName = `${cleanProjName}_통합본.txt`.replace(/[/\\?%*:|"<>\n\r]/g, "_");
+      folder.file(unifiedName, unifiedText);
+
+      try {
+        const content = await zip.generateAsync({ type: "blob" });
+        await saveFileWithPicker(content, `${cleanProjName}.zip`);
+      } catch (err) {
+        console.error(err);
+        showToast("압축 패키징 중 실패했습니다.");
+      }
+    }
+
+    async function exportProjectTo7z() {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      
+      rebuildIndexMaps();
+      showToast("7z 압축 패키징 스트림 생성 중...");
+
+      if (typeof JSZip === 'undefined') {
+        showToast("엔진 로드 상태를 확인하세요.");
+        return;
+      }
+
+      const zip = new JSZip();
+      const cleanProjName = proj.name.replace(/[/\\?%*:|"<>\n\r]/g, "_");
+      const folder = zip.folder(cleanProjName);
+      
+      const sorted = getSortedDocumentsList();
+      sorted.forEach(item => {
+        const fileName = `${item.index}. ${item.title}.md`.replace(/[/\\?%*:|"<>\n\r]/g, "_");
+        folder.file(fileName, item.content || "");
+      });
+
+      const unifiedText = generateUnifiedText();
+      const unifiedName = `${cleanProjName}_통합본.txt`.replace(/[/\\?%*:|"<>\n\r]/g, "_");
+      folder.file(unifiedName, unifiedText);
+
+      try {
+        const content = await zip.generateAsync({ type: "blob", compression: "DEFLATE", compressionOptions: { level: 9 } });
+        await saveFileWithPicker(content, `${cleanProjName}.7z`);
+      } catch (err) {
+        console.error(err);
+        showToast("7z 아카이브 스트림 작성 실패");
+      }
+    }
+
+    async function exportProjectToFolder() {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+
+      if (!window.showDirectoryPicker) {
+        showToast("현재 환경 브라우저는 파일 시스템 API 직접 제어를 지원하지 않습니다. ZIP 다운로드 기능을 활용해 주세요.");
+        return;
+      }
+
+      rebuildIndexMaps();
+      
+      let dirHandle = null;
+      
+      try {
+        showToast("내보낼 대상 로컬 폴더를 지정해 주세요.");
+        dirHandle = await window.showDirectoryPicker();
+      } catch (err) {
+        console.warn("Folder Selector Canceled:", err);
+        showToast("폴더 지정이 취소되었습니다.");
+        return;
+      }
+
+      showToast("로컬 폴더 기획 파일 동기화 작업 시작...");
+      try {
+        const sorted = getSortedDocumentsList();
+        
+        for (const item of sorted) {
+          const cleanName = `${item.index}. ${item.title}.md`.replace(/[/\\?%*:|"<>\n\r]/g, "_");
+          const fileHandle = await dirHandle.getFileHandle(cleanName, { create: true });
+          const writable = await fileHandle.createWritable();
+          await writable.write(item.content || "");
+          await writable.close();
+        }
+
+        const cleanProjName = proj.name.replace(/[/\\?%*:|"<>\n\r]/g, "_");
+        const unifiedText = generateUnifiedText();
+        const unifiedName = `${cleanProjName}_통합본.txt`.replace(/[/\\?%*:|"<>\n\r]/g, "_");
+        
+        const unifiedHandle = await dirHandle.getFileHandle(unifiedName, { create: true });
+        const writableUnified = await unifiedHandle.createWritable();
+        await writableUnified.write(unifiedText);
+        await writableUnified.close();
+
+        showToast("지정한 대상 로컬 폴더로 기획 파일 갱신 및 내보내기 완료!");
+      } catch (err) {
+        console.error("Folder Write Failed:", err);
+        showToast("폴더 내부에 쓰기 권한을 실행할 수 없습니다.");
+      }
+    }
+
+    async function exportUnifiedOnly() {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+
+      rebuildIndexMaps();
+      const unifiedText = generateUnifiedText();
+      const cleanProjName = proj.name.replace(/[/\\?%*:|"<>\n\r]/g, "_");
+      
+      const blob = new Blob([unifiedText], { type: "text/plain;charset=utf-8" });
+      await saveFileWithPicker(blob, `${cleanProjName}_통합본.txt`);
+    }
+
+    function initializeDefaultState() {
+      const defaultId = "proj-default";
+      appState = {
+        projects: {
+          [defaultId]: {
+            id: defaultId,
+            name: "새 프로젝트",
+            activeDocId: "doc-root",
+            expandedNodes: ["doc-root"],
+            documents: {
+              "doc-root": {
+                id: "doc-root",
+                title: "새 프로젝트",
+                parentId: null,
+                childIds: [],
+                content: "" 
+              }
+            }
+          }
+        },
+        activeProjectId: defaultId,
+        spellcheckActive: false,
+        showTopBacklinks: true,
+        navigatedFromDocId: null,
+        // [Case 1] 기본 스크롤 포지션 구조 초기화
+        scrollPositions: {}
+      };
+      saveStateToCache();
+    }
+
+    async function saveStateToCache() {
+      try {
+        await setDbValue("app_state", appState);
+      } catch (e) {
+        console.error("IndexedDB Save Exception:", e);
+      }
+    }
+
+    function toggleMenuDropdown(e, menuId) {
+      e.stopPropagation();
+      const parent = e.target.closest('.menu-item-container');
+      const wasActive = parent.classList.contains('active');
+      
+      closeAllDropdowns();
+      
+      if (!wasActive) {
+        parent.classList.add('active');
+      }
+    }
+
+    function closeAllDropdowns() {
+      document.querySelectorAll('.menu-item-container').forEach(c => c.classList.remove('active'));
+    }
+
+    function showAboutModal() {
+      openCustomConfirm("Wikinote Hybrid 정보", "Wikinote Hybrid Workspace v2.6.2 - Super accuracy Double-Click Routing Edition", () => {});
+    }
+
+    function showShortcutModal() {
+      const htmlContent = `
+        <table class="shortcut-table">
+          <thead>
+            <tr>
+              <th>기능 명칭</th>
+              <th>단축키 / 조작 방법</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>새 하위 문서 생성</td>
+              <td><span class="shortcut-key">Ctrl + N</span></td>
+            </tr>
+            <tr>
+              <td>프로젝트 저장</td>
+              <td><span class="shortcut-key">Ctrl + S</span></td>
+            </tr>
+            <tr>
+              <td>워크스페이스 토글</td>
+              <td><span class="shortcut-key">Ctrl + B</span></td>
+            </tr>
+            <tr>
+              <td>위키 링크 바로 삽입</td>
+              <td><span class="shortcut-key">Ctrl + L</span></td>
+            </tr>
+            <tr>
+              <td>현재 문서 역링크 보기</td>
+              <td><span class="shortcut-key">Alt + B</span></td>
+            </tr>
+            <tr>
+              <td>강조 색상 팔레트 열기</td>
+              <td><span class="shortcut-key">Alt + C</span></td>
+            </tr>
+            <tr>
+              <td>실행 취소</td>
+              <td><span class="shortcut-key">Ctrl + Z</span></td>
+            </tr>
+            <tr>
+              <td>다시 실행</td>
+              <td><span class="shortcut-key">Ctrl + Y</span></td>
+            </tr>
+            <tr>
+              <td>단축키 안내</td>
+              <td><span class="shortcut-key">F1</span></td>
+            </tr>
+            <tr>
+              <td>동일 위상 다중 선택</td>
+              <td><span class="shortcut-key">Ctrl + 클릭</span> (0번 제외 동일 위상 개별 추가/제거)</td>
+            </tr>
+            <tr>
+              <td>동일 위상 전체 선택</td>
+              <td><span class="shortcut-key">Shift + 클릭</span> (0번 제외 해당 위상 모든 문서 선택)</td>
+            </tr>
+            <tr>
+              <td>선택 문서 일괄 이동</td>
+              <td><span class="shortcut-key">다중 선택 후 드래그</span> (지정한 부모/구조로 일괄 이동)</td>
+            </tr>
+            <tr>
+              <td>선택 또는 현재 문서 삭제</td>
+              <td><span class="shortcut-key">Delete</span> (선택 문서가 있으면 선택 삭제, 없으면 현재 문서 삭제)</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+      openCustomConfirm("WNH 워크스페이스 단축키 정보", htmlContent, () => {});
+    }
+
+    function openCustomPrompt(title, message, defaultVal, onOk, isRequired = false) {
+      const backdrop = document.getElementById("modal-backdrop");
+      const inputEl = document.getElementById("custom-modal-input");
+      document.getElementById("modal-header-text").innerText = title;
+      document.getElementById("custom-modal-msg").innerHTML = message;
+      inputEl.style.display = "block";
+      inputEl.value = defaultVal;
+      backdrop.classList.add("show");
+      inputEl.focus();
+
+      const okBtn = document.getElementById("modal-ok-btn");
+      const cancelBtn = document.getElementById("modal-cancel-btn");
+      const tearDown = () => { backdrop.classList.remove("show"); okBtn.onclick = null; cancelBtn.onclick = null; };
+
+      okBtn.onclick = () => {
+        const val = inputEl.value.trim();
+        if (isRequired && !val) return;
+        onOk(val);
+        tearDown();
+      };
+      cancelBtn.onclick = tearDown;
+    }
+
+    function openCustomConfirm(title, message, onOk) {
+      const backdrop = document.getElementById("modal-backdrop");
+      document.getElementById("custom-modal-input").style.display = "none";
+      document.getElementById("modal-header-text").innerText = title;
+      document.getElementById("custom-modal-msg").innerHTML = message;
+      backdrop.classList.add("show");
+
+      const okBtn = document.getElementById("modal-ok-btn");
+      const cancelBtn = document.getElementById("modal-cancel-btn");
+      const tearDown = () => { backdrop.classList.remove("show"); okBtn.onclick = null; cancelBtn.onclick = null; };
+
+      okBtn.onclick = () => { onOk(); tearDown(); };
+      cancelBtn.onclick = tearDown;
+    }
+
+    function rebuildIndexMaps() {
+      uuidToMetaMap.clear();
+      indexToUuidMap.clear();
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+
+      uuidToMetaMap.set("doc-root", { index: "0", title: proj.documents["doc-root"]?.title || proj.name });
+      indexToUuidMap.set("0", "doc-root");
+
+      const rootDoc = proj.documents["doc-root"];
+      if (rootDoc && rootDoc.childIds) {
+        rootDoc.childIds.forEach((childId, idx) => traverseAndBuildIndex(childId, (idx + 1).toString()));
+      }
+    }
+
+    function traverseAndBuildIndex(docId, indexStr) {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      const doc = proj.documents[docId];
+      if (!doc) return;
+      uuidToMetaMap.set(docId, { index: indexStr, title: doc.title });
+      indexToUuidMap.set(indexStr, docId);
+      if (doc.childIds) {
+        doc.childIds.forEach((childId, idx) => traverseAndBuildIndex(childId, indexStr + "." + (idx + 1).toString()));
+      }
+    }
+
+    // 다각도 지능형 위키 링크 분석 매칭 엔진
+    function resolveLink(linkContent) {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return null;
+
+      const trimmed = linkContent.trim();
+      if (!trimmed) return null;
+
+      const isPureIndex = /^[0-9]+(?:\.[0-9]+)*$/.test(trimmed);
+      if (isPureIndex) {
+        const targetId = indexToUuidMap.get(trimmed);
+        if (targetId && proj.documents[targetId]) {
+          // [Case 4] 타겟이 최상위 'doc-root'인데 쿼리 인덱스가 '0'이 아닐 경우 미매칭 차단
+          if (targetId === "doc-root" && trimmed !== "0") {
+            return null;
+          }
+          return targetId;
+        }
+      }
+
+      let numbering = null;
+      let titlePart = trimmed;
+
+      const match = trimmed.match(/^([0-9]+(?:\.[0-9]+)*)\.?\s*(.*)$/);
+      if (match) {
+        numbering = match[1];
+        titlePart = match[2].trim();
+      }
+
+      let resolvedId = null;
+
+      if (numbering && titlePart) {
+        for (const docId in proj.documents) {
+          const meta = uuidToMetaMap.get(docId);
+          const doc = proj.documents[docId];
+          if (meta && meta.index === numbering && doc.title === titlePart) {
+            resolvedId = docId;
+            break;
+          }
+        }
+      }
+
+      if (!resolvedId && titlePart) {
+        // [Case 4] 최상위 루트 프로젝트 명칭과의 충돌로 인한 튀기 버그 방지용 비-루트 문서 선검사
+        for (const docId in proj.documents) {
+          if (docId === "doc-root") continue;
+          const doc = proj.documents[docId];
+          if (doc.title === titlePart) {
+            resolvedId = docId;
+            break;
+          }
+        }
+        if (!resolvedId) {
+          if (proj.documents["doc-root"] && proj.documents["doc-root"].title === titlePart) {
+            resolvedId = "doc-root";
+          }
+        }
+        if (!resolvedId) {
+          for (const docId in proj.documents) {
+            if (docId === "doc-root") continue;
+            const doc = proj.documents[docId];
+            if (doc.title.toLowerCase() === titlePart.toLowerCase()) {
+              resolvedId = docId;
+              break;
+            }
+          }
+        }
+        if (!resolvedId) {
+          if (proj.documents["doc-root"] && proj.documents["doc-root"].title.toLowerCase() === titlePart.toLowerCase()) {
+            resolvedId = "doc-root";
+          }
+        }
+      }
+
+      if (!resolvedId && numbering) {
+        const targetId = indexToUuidMap.get(numbering);
+        if (targetId && proj.documents[targetId]) {
+          resolvedId = targetId;
+        }
+      }
+
+      // [Case 4] 탐색 쿼리 구문에 넘버링이 명시되어 있는데 결과가 루트로 오도되었을 경우 최종 방어 차단
+      if (resolvedId === "doc-root" && numbering && numbering !== "0") {
+        return null;
+      }
+
+      return resolvedId;
+    }
+
+    function getCurrentLinksMap() {
+      const proj = appState.projects[appState.activeProjectId];
+      const map = {};
+      if (!proj) return map;
+      for (const docId in proj.documents) {
+        const doc = proj.documents[docId];
+        const meta = uuidToMetaMap.get(docId);
+        if (meta) {
+          map[docId] = `[[${meta.index}. ${doc.title}]]`;
+        } else {
+          map[docId] = `[[${doc.title}]]`;
+        }
+      }
+      return map;
+    }
+
+    function globalBatchSyncWikiLinks(changes) {
+      if (!changes || changes.length === 0) return;
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+
+      const activeChanges = changes.filter(c => c.oldLink !== c.newLink);
+      if (activeChanges.length === 0) return;
+
+      let activeDocContentChanged = false;
+
+      for (const docId in proj.documents) {
+        const doc = proj.documents[docId];
+        if (!doc.content) continue;
+
+        let content = doc.content;
+
+        activeChanges.forEach(change => {
+          content = content.split(change.oldLink).join(`__WNH_TEMP_${change.docId}__`);
+        });
+
+        activeChanges.forEach(change => {
+          content = content.split(`__WNH_TEMP_${change.docId}__`).join(change.newLink);
+        });
+
+        if (doc.content !== content) {
+          doc.content = content;
+          if (docId === proj.activeDocId) {
+            activeDocContentChanged = true;
+          }
+        }
+      }
+
+      if (activeDocContentChanged) {
+        const editor = document.getElementById("document-editor");
+        const activeDoc = proj.documents[proj.activeDocId];
+        if (editor && activeDoc) {
+          const start = editor.selectionStart;
+          const end = editor.selectionEnd;
+          
+          editor.value = activeDoc.content || "";
+          editor.selectionStart = Math.min(start, editor.value.length);
+          editor.selectionEnd = Math.min(end, editor.value.length);
+          renderHighlightOverlay();
+          syncEditorHeight();
+        }
+      }
+      saveStateToCache();
+    }
+
+    function getLinkAtCaret(text, selStart, selEnd) {
+      const regex = /\[\[([^\]\n]+)\]\]/g;
+      let match;
+      while ((match = regex.exec(text)) !== null) {
+        const start = match.index;
+        const end = regex.lastIndex;
+        
+        if ((selStart >= start && selStart <= end) || 
+            (selEnd >= start && selEnd <= end) || 
+            (start >= selStart && end <= selEnd)) {
+          return match[1];
+        }
+      }
+      return null;
+    }
+
+    // 초정밀 세그먼트 파싱형 더블클릭 내비게이션 라우팅 엔진
+    function handleEditorDblClick(e) {
+      const editor = e.target;
+      const selStart = editor.selectionStart;
+      const selEnd = editor.selectionEnd;
+      const text = editor.value;
+
+      const linkContent = getLinkAtCaret(text, selStart, selEnd);
+      if (linkContent) {
+        e.preventDefault();
+        const targetId = resolveLink(linkContent);
+        if (targetId) {
+          const proj = appState.projects[appState.activeProjectId];
+          if (targetId === proj.activeDocId) {
+            showToast("자기 자신을 가리키는 링크입니다.");
+          } else {
+            selectDocument(targetId, proj.activeDocId);
+            showToast("해당 문서를 로드했습니다.");
+          }
+        } else {
+          showToast(`존재하지 않는 링크: "${linkContent}"`);
+        }
+      }
+    }
+
+    function adjustTreeContainerPadding() {
+      const treeContainer = document.getElementById("tree-container");
+      const sidebar = document.getElementById("panel-left");
+      if (treeContainer && sidebar) {
+        const halfHeight = sidebar.clientHeight / 2;
+        treeContainer.style.paddingBottom = halfHeight + "px";
+      }
+    }
+
+    function renderProjectLauncher() {
+      const scrollBox = document.getElementById("launcher-project-scroll-box");
+      if (!scrollBox) return;
+      scrollBox.innerHTML = "";
+      const projectsList = Object.values(appState.projects);
+      
+      if (projectsList.length === 0) {
+        scrollBox.innerHTML = '<div style="font-size:11px; color:#858585; text-align:center; padding:24px 0;">활성 프로젝트가 없습니다.</div>';
+        return;
+      }
+      
+      projectsList.forEach(proj => {
+        const item = document.createElement("div");
+        item.className = "launcher-project-item" + (proj.id === appState.activeProjectId ? " active-running" : "") + (proj.id === launcherSelectedProjectId ? " selected" : "");
+        item.onclick = () => selectLauncherProjectDetails(proj.id);
+        item.ondblclick = () => enterWorkspace(proj.id);
+        item.innerHTML = `<div class="proj-item-name">${proj.name}</div><div class="proj-item-desc">ID: ${proj.id}</div>`;
+        scrollBox.appendChild(item);
+      });
+    }
+
+    function selectLauncherProjectDetails(projId) {
+      launcherSelectedProjectId = projId;
+      renderProjectLauncher();
+      const inspector = document.getElementById("launcher-inspector-pane");
+      const proj = appState.projects[projId];
+      if (!proj) return;
+
+      inspector.innerHTML = `
+        <div class="launcher-details-container">
+          <div class="launcher-details-header">${proj.name}</div>
+          <div class="launcher-details-grid">
+            <span class="launcher-details-label">구동 모드</span><span>Classic Wiki Memo Mode</span>
+            <span class="launcher-details-label">문서 개수</span><span>총 ${Object.keys(proj.documents).length}개</span>
+          </div>
+          <div class="launcher-details-actions">
+            <button onclick="enterWorkspace('${proj.id}')" class="launcher-action-btn">열기</button>
+            <button onclick="deleteProject('${proj.id}')" class="launcher-action-btn secondary" style="color:#f85149;">삭제</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function enterWorkspace(projectId) {
+      appState.activeProjectId = projectId;
+      const proj = appState.projects[projectId];
+      
+      const titleLabel = document.getElementById("current-project-title-label");
+      if (titleLabel) titleLabel.innerText = proj.name;
+
+      document.getElementById("launcher-container").style.display = "none";
+      document.getElementById("workspace-container").style.visibility = "visible";
+
+      selectedNodeIds = [];
+      rebuildIndexMaps();
+      renderTree();
+      setTimeout(adjustTreeContainerPadding, 50);
+
+      loadActiveDocument();
+    }
+
+    function createNewProjectFromLauncher() {
+      openCustomPrompt("새 프로젝트", "이름을 입력하세요:", "새 프로젝트", (name) => {
+        const newId = 'proj-' + Math.random().toString(36).substr(2, 9);
+        appState.projects[newId] = {
+          id: newId,
+          name: name,
+          activeDocId: "doc-root",
+          expandedNodes: ["doc-root"],
+          documents: {
+            "doc-root": {
+              id: "doc-root",
+              title: name,
+              parentId: null,
+              childIds: [],
+              content: "" 
+            }
+          }
+        };
+        appState.activeProjectId = newId;
+        saveStateToCache();
+        launcherSelectedProjectId = newId;
+        renderProjectLauncher();
+        selectLauncherProjectDetails(newId);
+      }, true);
+    }
+
+    function deleteProject(projId) {
+      openCustomConfirm("프로젝트 완전 제거", "이 프로젝트 및 모든 문서를 정말 지우시겠습니까?", () => {
+        delete appState.projects[projId];
+        if (appState.activeProjectId === projId) {
+          appState.activeProjectId = Object.keys(appState.projects)[0] || "";
+        }
+        saveStateToCache();
+        if (Object.keys(appState.projects).length === 0) {
+          initializeDefaultState();
+        }
+        renderProjectLauncher();
+        selectLauncherProjectDetails("");
+      });
+    }
+
+    function renderTree() {
+      const container = document.getElementById("tree-container");
+      container.innerHTML = "";
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      const roots = Object.values(proj.documents).filter(doc => doc.parentId === null);
+      roots.forEach(root => buildTreeDOMNode(root.id, 0, container));
+    }
+
+    function buildTreeDOMNode(docId, depth, container) {
+      const proj = appState.projects[appState.activeProjectId];
+      const doc = proj.documents[docId];
+      if (!doc) return;
+      const meta = uuidToMetaMap.get(docId) || { index: "0", title: doc.title };
+      const isActive = proj.activeDocId === docId;
+      const isSelected = selectedNodeIds.includes(docId);
+
+      const rowEl = document.createElement("div");
+      rowEl.className = "tree-row" + (isActive ? " active" : "") + (isSelected ? " selected-node" : "");
+      rowEl.setAttribute("data-id", docId);
+      rowEl.setAttribute("draggable", "false");
+
+      if (docId !== "doc-root") {
+        rowEl.addEventListener("mousedown", handleTreeMouseDown);
+        rowEl.addEventListener("touchstart", handleTreeTouchStart, { passive: false });
+        rowEl.addEventListener("dragstart", (e) => e.preventDefault());
+        rowEl.addEventListener("selectstart", (e) => e.preventDefault());
+      }
+
+      rowEl.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        showTreeContextMenu(e, docId);
+      });
+
+      rowEl.onclick = (e) => {
+        if (e.target.closest('.node-actions') || e.target.closest('.tree-caret')) return;
+        
+        if (docId === "doc-root") {
+          if (e.shiftKey || e.ctrlKey) return; 
+          selectDocument(docId);
+          return;
+        }
+
+        if (e.shiftKey || e.ctrlKey) {
+          e.stopPropagation();
+          handleMultiSelect(docId, e.shiftKey, e.ctrlKey);
+          return;
+        }
+        
+        selectDocument(docId);
+      };
+
+      let guide = "";
+      for (let i = 0; i < depth; i++) guide += "  ";
+
+      const contentWrap = document.createElement("div");
+      contentWrap.className = "node-content-wrap";
+
+      const guideSpan = document.createElement("span");
+      guideSpan.className = "indent-guide";
+      guideSpan.textContent = guide + "- ";
+      contentWrap.appendChild(guideSpan);
+
+      const hasChildren = doc.childIds && doc.childIds.length > 0;
+      const isExpanded = proj.expandedNodes && proj.expandedNodes.includes(docId);
+
+      if (hasChildren) {
+        const caretEl = document.createElement("span");
+        caretEl.className = "tree-caret";
+        caretEl.onclick = (e) => {
+          e.stopPropagation();
+          toggleNodeExpanded(docId);
+        };
+        caretEl.innerHTML = `
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="transition: transform 0.1s ease; transform: ${isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'};">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        `;
+        contentWrap.appendChild(caretEl);
+      } else {
+        const spacerEl = document.createElement("span");
+        spacerEl.className = "tree-caret-spacer";
+        contentWrap.appendChild(spacerEl);
+      }
+
+      const labelSpan = document.createElement("span");
+      labelSpan.className = "node-label";
+      labelSpan.textContent = `${meta.index}. ${doc.title}`;
+      contentWrap.appendChild(labelSpan);
+
+      rowEl.appendChild(contentWrap);
+
+      const actionWrap = document.createElement("div");
+      actionWrap.className = "node-actions";
+
+      const addBtn = document.createElement("button");
+      addBtn.className = "node-action-btn";
+      addBtn.innerHTML = "+";
+      addBtn.title = "이 문서 아래에 새 문서 신속 추가";
+      addBtn.onclick = (e) => {
+        e.stopPropagation();
+        createNodeUnderParent(docId);
+      };
+      actionWrap.appendChild(addBtn);
+
+      if (docId !== "doc-root") {
+        const delBtn = document.createElement("button");
+        delBtn.className = "node-action-btn delete-btn";
+        delBtn.innerHTML = "×";
+        delBtn.title = "이 문서 및 하위 구조 완전 제거";
+        delBtn.onclick = (e) => {
+          e.stopPropagation();
+          deleteDocumentNode(docId);
+        };
+        actionWrap.appendChild(delBtn);
+      }
+
+      rowEl.appendChild(actionWrap);
+      container.appendChild(rowEl);
+
+      if (isExpanded && doc.childIds) {
+        doc.childIds.forEach(cId => buildTreeDOMNode(cId, depth + 1, container));
+      }
+    }
+
+    // =============================================================
+    // ⚙️ 사이드바 트리 확장형 마우스 우클릭 컨텍스트 메뉴 처리부
+    // =============================================================
+    function showTreeContextMenu(e, docId) {
+      contextMenuTargetId = docId;
+      const menu = document.getElementById("tree-context-menu");
+      if (!menu) return;
+
+      menu.style.display = "flex";
+      menu.style.left = `${e.pageX}px`;
+      menu.style.top = `${e.pageY}px`;
+
+      // 1. 공통 항목 활성화
+      document.getElementById("context-add-btn").style.display = "block";
+      document.getElementById("context-backlinks-btn").style.display = "block";
+      document.getElementById("context-divider-1").style.display = "block";
+      document.getElementById("context-divider-2").style.display = "block";
+      document.getElementById("context-copy-btn").style.display = "block";
+
+      const delBtn = document.getElementById("context-delete-btn");
+      const cutBtn = document.getElementById("context-cut-btn");
+      const pasteBtn = document.getElementById("context-paste-btn");
+
+      // 2. 루트(0번) 문서 일때 제약조건 처리
+      if (docId === "doc-root") {
+        delBtn.style.display = "none";
+        cutBtn.style.display = "none";
+      } else {
+        delBtn.style.display = "block";
+        cutBtn.style.display = "block";
+      }
+
+      // 3. 붙여넣기 노출 및 비활성화(회색 처리) 상태 설정
+      pasteBtn.style.display = "block";
+      if (clipboardNode) {
+        pasteBtn.disabled = false;
+        pasteBtn.style.opacity = "1";
+        pasteBtn.style.color = "#cccccc";
+      } else {
+        pasteBtn.disabled = true;
+        pasteBtn.style.opacity = "0.4";
+        pasteBtn.style.color = "#555555";
+      }
+    }
+
+    // 빈 화면 영역 우클릭 메뉴 분기 처리
+    function showEmptySpaceContextMenu(e) {
+      contextMenuTargetId = "doc-root";
+      const menu = document.getElementById("tree-context-menu");
+      if (!menu) return;
+
+      menu.style.display = "flex";
+      menu.style.left = `${e.pageX}px`;
+      menu.style.top = `${e.pageY}px`;
+
+      // 1. 개별 문서용 기능 전체 가리기
+      document.getElementById("context-add-btn").style.display = "none";
+      document.getElementById("context-delete-btn").style.display = "none";
+      document.getElementById("context-backlinks-btn").style.display = "none";
+      document.getElementById("context-divider-1").style.display = "none";
+      document.getElementById("context-divider-2").style.display = "none";
+      document.getElementById("context-cut-btn").style.display = "none";
+      document.getElementById("context-copy-btn").style.display = "none";
+
+      // 2. 붙여넣기 전용 버튼 노출 및 회색 처리 제어
+      const pasteBtn = document.getElementById("context-paste-btn");
+      pasteBtn.style.display = "block";
+
+      if (clipboardNode) {
+        pasteBtn.disabled = false;
+        pasteBtn.style.opacity = "1";
+        pasteBtn.style.color = "#cccccc";
+      } else {
+        pasteBtn.disabled = true;
+        pasteBtn.style.opacity = "0.4";
+        pasteBtn.style.color = "#555555";
+      }
+    }
+
+    function hideContextMenu() {
+      const menu = document.getElementById("tree-context-menu");
+      if (menu) {
+        menu.style.display = "none";
+      }
+    }
+
+    function contextAddSubDoc() {
+      if (!contextMenuTargetId) return;
+      createNodeUnderParent(contextMenuTargetId);
+      hideContextMenu();
+    }
+
+    function contextDeleteDoc() {
+      if (!contextMenuTargetId) return;
+      deleteDocumentNode(contextMenuTargetId);
+      hideContextMenu();
+    }
+
+    function contextViewBacklinks() {
+      if (!contextMenuTargetId) return;
+      showBacklinksModal(contextMenuTargetId);
+      hideContextMenu();
+    }
+
+    // 잘라내기 핸들러
+    function contextCutDoc() {
+      if (!contextMenuTargetId || contextMenuTargetId === "doc-root") return;
+      clipboardNode = {
+        action: 'cut',
+        sourceDocId: contextMenuTargetId,
+        sourceProjId: appState.activeProjectId,
+        data: null
+      };
+      showToast("문서를 잘라내어 클립보드에 담았습니다.");
+      hideContextMenu();
+    }
+
+    // 하위 트리 데이터를 재귀적으로 가져오는 내부 헬퍼 함수
+    function getSubtreeData(proj, rootId) {
+      const doc = proj.documents[rootId];
+      if (!doc) return null;
+      const data = {
+        title: doc.title,
+        content: doc.content || "",
+        children: []
+      };
+      if (doc.childIds) {
+        doc.childIds.forEach(cId => {
+          const childData = getSubtreeData(proj, cId);
+          if (childData) data.children.push(childData);
+        });
+      }
+      return data;
+    }
+
+    // 복사 핸들러
+    function contextCopyDoc() {
+      if (!contextMenuTargetId) return;
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      
+      const data = getSubtreeData(proj, contextMenuTargetId);
+      if (data) {
+        clipboardNode = {
+          action: 'copy',
+          sourceDocId: contextMenuTargetId,
+          sourceProjId: appState.activeProjectId,
+          data: data
+        };
+        showToast("선택한 문서와 하위 구조를 복사했습니다.");
+      }
+      hideContextMenu();
+    }
+
+    function contextPasteDoc() {
+      if (!contextMenuTargetId) return;
+      executePaste(contextMenuTargetId);
+      hideContextMenu();
+    }
+
+    // 복사/잘라내기 처리 엔진 핵심부 (하위 폴더 붙여넣기와 빈 공간 최상위 루트 붙여넣기 통합 제어)
+    function executePaste(targetParentId) {
+      if (!clipboardNode) return;
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+
+      // 잘라내기 붙여넣기 (이동 동작)
+      if (clipboardNode.action === 'cut') {
+        if (clipboardNode.sourceProjId !== appState.activeProjectId) {
+          showToast("다른 프로젝트 간 잘라내기는 지원하지 않습니다.");
+          return;
+        }
+
+        const srcId = clipboardNode.sourceDocId;
+        const blacklist = getDescendantIds(srcId);
+        if (blacklist.includes(targetParentId)) {
+          showToast("자기 자신 또는 하위 문서로는 이동할 수 없습니다.");
+          return;
+        }
+
+        const srcDoc = proj.documents[srcId];
+        if (!srcDoc) return;
+
+        // 1. 기존 부모의 자식 배열에서 격리 처리
+        if (srcDoc.parentId && proj.documents[srcDoc.parentId]) {
+          const oldParent = proj.documents[srcDoc.parentId];
+          oldParent.childIds = oldParent.childIds.filter(id => id !== srcId);
+        }
+
+        // 2. 신규 부모 바인딩
+        srcDoc.parentId = targetParentId;
+        if (!proj.documents[targetParentId].childIds) {
+          proj.documents[targetParentId].childIds = [];
+        }
+        proj.documents[targetParentId].childIds.push(srcId);
+
+        // 3. 트리 확장 상태 보정
+        if (!proj.expandedNodes.includes(targetParentId)) {
+          proj.expandedNodes.push(targetParentId);
+        }
+
+        const oldLinksMap = getCurrentLinksMap();
+        rebuildIndexMaps();
+        const newLinksMap = getCurrentLinksMap();
+
+        const changes = [];
+        for (const dId in oldLinksMap) {
+          if (newLinksMap[dId]) {
+            changes.push({
+              docId: dId,
+              oldLink: oldLinksMap[dId],
+              newLink: newLinksMap[dId]
+            });
+          }
+        }
+        globalBatchSyncWikiLinks(changes);
+        renderTree();
+        loadActiveDocument();
+        saveStateToCache();
+
+        showToast("문서 위치가 정상적으로 이동되었습니다.");
+        clipboardNode = null; 
+      } 
+      // 복사하여 붙여넣기 (재귀 복제 동작)
+      else if (clipboardNode.action === 'copy') {
+        function instantiateSubtree(subtreeData, parentId) {
+          const newId = 'doc-' + Math.random().toString(36).substr(2, 9);
+          proj.documents[newId] = {
+            id: newId,
+            title: subtreeData.title,
+            parentId: parentId,
+            childIds: [],
+            content: subtreeData.content
+          };
+          if (subtreeData.children && subtreeData.children.length > 0) {
+            subtreeData.children.forEach(childSubtree => {
+              const childId = instantiateSubtree(childSubtree, newId);
+              proj.documents[newId].childIds.push(childId);
+            });
+          }
+          return newId;
+        }
+
+        const newRootId = instantiateSubtree(clipboardNode.data, targetParentId);
+        if (!proj.documents[targetParentId].childIds) {
+          proj.documents[targetParentId].childIds = [];
+        }
+        proj.documents[targetParentId].childIds.push(newRootId);
+
+        if (!proj.expandedNodes.includes(targetParentId)) {
+          proj.expandedNodes.push(targetParentId);
+        }
+
+        const oldLinksMap = getCurrentLinksMap();
+        rebuildIndexMaps();
+        const newLinksMap = getCurrentLinksMap();
+
+        const changes = [];
+        for (const dId in oldLinksMap) {
+          if (newLinksMap[dId]) {
+            changes.push({
+              docId: dId,
+              oldLink: oldLinksMap[dId],
+              newLink: newLinksMap[dId]
+            });
+          }
+        }
+        globalBatchSyncWikiLinks(changes);
+        renderTree();
+        loadActiveDocument();
+        saveStateToCache();
+
+        showToast("하위 기획 구조를 포함한 문서 복제가 완료되었습니다.");
+      }
+    }
+
+    function toggleNodeExpanded(docId) {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      if (!proj.expandedNodes) proj.expandedNodes = [];
+
+      const index = proj.expandedNodes.indexOf(docId);
+      if (index > -1) {
+        proj.expandedNodes.splice(index, 1);
+      } else {
+        proj.expandedNodes.push(docId);
+      }
+
+      saveStateToCache();
+      renderTree();
+    }
+
+    function handleMultiSelect(docId, shiftKey, ctrlKey) {
+      if (docId === "doc-root") return;
+
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      const targetDoc = proj.documents[docId];
+      if (!targetDoc) return;
+      const parentId = targetDoc.parentId;
+
+      if (selectedNodeIds.length > 0) {
+        const firstId = selectedNodeIds[0];
+        const firstDoc = proj.documents[firstId];
+        if (firstDoc && firstDoc.parentId !== parentId) {
+          selectedNodeIds = [];
+        }
+      }
+
+      if (shiftKey) {
+        let siblings = [];
+        if (parentId && proj.documents[parentId]) {
+          siblings = [...proj.documents[parentId].childIds];
+        } else {
+          siblings = Object.values(proj.documents)
+            .filter(d => d.parentId === null)
+            .map(d => d.id);
+        }
+        siblings = siblings.filter(id => id !== "doc-root");
+        selectedNodeIds = siblings;
+      } else if (ctrlKey) {
+        const idx = selectedNodeIds.indexOf(docId);
+        if (idx > -1) {
+          selectedNodeIds.splice(idx, 1);
+        } else {
+          selectedNodeIds.push(docId);
+        }
+      }
+
+      renderTree();
+    }
+
+    function handleTreeMouseDown(e) {
+      if (e.target.closest('.node-actions') || e.target.closest('.tree-caret')) return;
+      if (e.button !== 0) return; 
+
+      const rowId = e.currentTarget.getAttribute("data-id");
+      if (rowId === "doc-root") return;
+
+      setupCustomDragStart(rowId, e.clientX, e.clientY);
+
+      window.addEventListener("mousemove", handleGlobalMouseMove);
+      window.addEventListener("mouseup", handleGlobalMouseUp);
+    }
+
+    function handleTreeTouchStart(e) {
+      if (e.target.closest('.node-actions') || e.target.closest('.tree-caret')) return;
+
+      const touch = e.touches[0];
+      const rowId = e.currentTarget.getAttribute("data-id");
+      if (rowId === "doc-root") return;
+
+      e.preventDefault();
+      setupCustomDragStart(rowId, touch.clientX, touch.clientY);
+
+      window.addEventListener("touchmove", handleGlobalTouchMove, { passive: false });
+      window.addEventListener("touchend", handleGlobalTouchEnd);
+    }
+
+    function setupCustomDragStart(sourceId, x, y) {
+      appState.draggedNodeId = sourceId;
+      
+      const nodesToDrag = selectedNodeIds.includes(sourceId) ? [...selectedNodeIds] : [sourceId];
+      let blacklist = [];
+      nodesToDrag.forEach(id => {
+        blacklist = blacklist.concat(getDescendantIds(id));
+      });
+      appState.descendantsBlacklist = blacklist;
+      appState.dropPos = null;
+
+      dragInfo.isDragging = false;
+      dragInfo.sourceId = sourceId;
+      dragInfo.targetId = null;
+      dragInfo.startX = x;
+      dragInfo.startY = y;
+    }
+
+    function handleGlobalMouseMove(e) {
+      processDragMove(e.clientX, e.clientY);
+    }
+
+    function handleGlobalTouchMove(e) {
+      e.preventDefault();
+      const touch = e.touches[0];
+      processDragMove(touch.clientX, touch.clientY);
+    }
+
+    function processDragMove(clientX, clientY) {
+      if (!dragInfo.sourceId) return;
+
+      if (!dragInfo.isDragging) {
+        const dist = Math.hypot(clientX - dragInfo.startX, clientY - dragInfo.startY);
+        if (dist > 5) {
+          dragInfo.isDragging = true;
+          document.body.classList.add("dragging-active");
+
+          const nodesToDrag = selectedNodeIds.includes(dragInfo.sourceId) ? [...selectedNodeIds] : [dragInfo.sourceId];
+          nodesToDrag.forEach(id => {
+            const row = document.querySelector(`.tree-row[data-id="${id}"]`);
+            if (row) row.style.opacity = "0.4";
+          });
+        }
+      }
+
+      if (!dragInfo.isDragging) return;
+
+      const el = document.elementFromPoint(clientX, clientY);
+      if (!el) {
+        clearDragIndicators();
+        dragInfo.targetId = null;
+        return;
+      }
+
+      const targetRow = el.closest(".tree-row");
+      if (!targetRow) {
+        clearDragIndicators();
+        dragInfo.targetId = null;
+        return;
+      }
+
+      const targetId = targetRow.getAttribute("data-id");
+
+      if (appState.descendantsBlacklist.includes(targetId)) {
+        clearDragIndicators();
+        dragInfo.targetId = null;
+        return;
+      }
+
+      dragInfo.targetId = targetId;
+
+      const rect = targetRow.getBoundingClientRect();
+      const relativeY = clientY - rect.top;
+      const height = rect.height;
+
+      clearDragIndicators();
+
+      if (targetId === "doc-root") {
+        appState.dropPos = "inside";
+        targetRow.classList.add("drag-over-inside");
+        return;
+      }
+
+      if (relativeY < height * 0.25) {
+        targetRow.classList.add("drag-over-before");
+        appState.dropPos = "before";
+      } else if (relativeY > height * 0.75) {
+        targetRow.classList.add("drag-over-after");
+        appState.dropPos = "after";
+      } else {
+        targetRow.classList.add("drag-over-inside");
+        appState.dropPos = "inside";
+      }
+    }
+
+    function handleGlobalMouseUp(e) {
+      finalizeDrag();
+      window.removeEventListener("mousemove", handleGlobalMouseMove);
+      window.removeEventListener("mouseup", handleGlobalMouseUp);
+    }
+
+    function handleGlobalTouchEnd(e) {
+      finalizeDrag();
+      window.removeEventListener("touchmove", handleGlobalTouchMove);
+      window.removeEventListener("touchend", handleGlobalTouchEnd);
+    }
+
+    function finalizeDrag() {
+      document.body.classList.remove("dragging-active");
+
+      if (dragInfo.sourceId) {
+        const nodesToDrag = selectedNodeIds.includes(dragInfo.sourceId) ? [...selectedNodeIds] : [dragInfo.sourceId];
+        nodesToDrag.forEach(id => {
+          const row = document.querySelector(`.tree-row[data-id="${id}"]`);
+          if (row) row.style.opacity = "1";
+        });
+      }
+
+      if (dragInfo.isDragging && dragInfo.sourceId && dragInfo.targetId && appState.dropPos) {
+        const draggedId = dragInfo.sourceId;
+        const targetId = dragInfo.targetId;
+        const dropPos = appState.dropPos;
+
+        const proj = appState.projects[appState.activeProjectId];
+        if (proj) {
+          const nodesToDrag = selectedNodeIds.includes(draggedId) ? [...selectedNodeIds] : [draggedId];
+          const validNodesToDrag = nodesToDrag.filter(id => id !== "doc-root" && proj.documents[id]);
+
+          if (validNodesToDrag.length > 0) {
+            validNodesToDrag.forEach(id => {
+              const doc = proj.documents[id];
+              if (doc && doc.parentId && proj.documents[doc.parentId]) {
+                const oldParent = proj.documents[doc.parentId];
+                oldParent.childIds = oldParent.childIds.filter(cid => cid !== id);
+              }
+            });
+
+            if (dropPos === "inside") {
+              validNodesToDrag.forEach(id => {
+                const doc = proj.documents[id];
+                doc.parentId = targetId;
+                if (!proj.documents[targetId].childIds) {
+                  proj.documents[targetId].childIds = [];
+                }
+                proj.documents[targetId].childIds.push(id);
+              });
+
+              if (!proj.expandedNodes.includes(targetId)) {
+                proj.expandedNodes.push(targetId);
+              }
+            } else {
+              const targetDoc = proj.documents[targetId];
+              const newParentId = targetDoc.parentId;
+
+              validNodesToDrag.forEach(id => {
+                proj.documents[id].parentId = newParentId;
+              });
+
+              if (newParentId && proj.documents[newParentId]) {
+                const newParent = proj.documents[newParentId];
+                let targetIndex = newParent.childIds.indexOf(targetId);
+
+                if (targetIndex === -1) {
+                  newParent.childIds = newParent.childIds.concat(validNodesToDrag);
+                } else {
+                  const insertIndex = dropPos === "before" ? targetIndex : targetIndex + 1;
+                  newParent.childIds.splice(insertIndex, 0, ...validNodesToDrag);
+                }
+              }
+            }
+
+            const oldLinksMap = getCurrentLinksMap();
+            rebuildIndexMaps();
+            const newLinksMap = getCurrentLinksMap();
+
+            const changes = [];
+            for (const dId in oldLinksMap) {
+              if (newLinksMap[dId]) {
+                changes.push({
+                  docId: dId,
+                  oldLink: oldLinksMap[dId],
+                  newLink: newLinksMap[dId]
+                });
+              }
+            }
+
+            globalBatchSyncWikiLinks(changes);
+            renderTree();
+            loadActiveDocument();
+            saveStateToCache();
+          }
+        }
+      }
+
+      clearDragIndicators();
+      appState.draggedNodeId = null;
+      appState.descendantsBlacklist = null;
+      appState.dropPos = null;
+      dragInfo.isDragging = false;
+      dragInfo.sourceId = null;
+      dragInfo.targetId = null;
+    }
+
+    function getDescendantIds(docId) {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return [];
+      let list = [docId];
+      const doc = proj.documents[docId];
+      if (doc && doc.childIds) {
+        doc.childIds.forEach(cId => {
+          list = list.concat(getDescendantIds(cId));
+        });
+      }
+      return list;
+    }
+
+    function clearDragIndicators() {
+      document.querySelectorAll(".tree-row").forEach(el => {
+        el.classList.remove("drag-over-before", "drag-over-after", "drag-over-inside");
+      });
+    }
+
+    // 문서 선택 및 스크롤 위치 관리
+    // [Case 3] 역링크 수신 대상을 추적 복구하기 위해 scrollToOffset 매개변수 도입
+    function selectDocument(docId, fromDocId = null, scrollToOffset = null) {
+      saveCurrentDocContent();
+      const proj = appState.projects[appState.activeProjectId];
+      proj.activeDocId = docId;
+      
+      if (fromDocId) {
+        appState.navigatedFromDocId = fromDocId;
+      } else {
+        appState.navigatedFromDocId = null; 
+      }
+      
+      selectedNodeIds = [];
+
+      // [Case 1] 강제 0 좌표 복원 코드를 지우고 로더 함수 내부에서 마지막 위치를 자동 검사 및 복원하도록 이관
+      loadActiveDocument(scrollToOffset);
+      renderTree();
+    }
+
+    function saveCurrentDocContent() {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      const doc = proj.documents[proj.activeDocId];
+      if (doc) {
+        const val = document.getElementById("document-editor").value;
+        doc.content = val;
+
+        // [Case 1] 부모 캔버스의 실시간 스크롤바 높이를 메모리에 기억
+        const container = document.getElementById("editor-container-box");
+        if (container) {
+          if (!appState.scrollPositions) appState.scrollPositions = {};
+          appState.scrollPositions[doc.id] = container.scrollTop;
+        }
+      }
+      saveStateToCache();
+    }
+
+    function saveCurrentDocTitle() {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      const doc = proj.documents[proj.activeDocId];
+      if (!doc) return;
+      const val = document.getElementById("document-title-input").value.trim();
+      if (val && val !== doc.title) {
+        const oldLinksMap = getCurrentLinksMap();
+
+        doc.title = val;
+        if (doc.id === "doc-root") proj.name = val;
+        saveStateToCache();
+
+        rebuildIndexMaps();
+        const newLinksMap = getCurrentLinksMap();
+
+        const changes = [];
+        for (const dId in oldLinksMap) {
+          if (newLinksMap[dId]) {
+            changes.push({
+              docId: dId,
+              oldLink: oldLinksMap[dId],
+              newLink: newLinksMap[dId]
+            });
+          }
+        }
+
+        globalBatchSyncWikiLinks(changes);
+        renderTree();
+        updateBreadcrumbs();
+        
+        const textarea = document.getElementById("document-editor");
+        textarea.value = doc.content || "";
+        renderHighlightOverlay();
+      }
+    }
+
+    // [Case 1] 글을 수정하거나 클릭/포커스할 때 일어나는 Collapsing 스크롤 튕김 완전 해결
+    function syncEditorHeight() {
+      const textarea = document.getElementById("document-editor");
+      const overlay = document.getElementById("editor-highlight-overlay");
+      const container = document.getElementById("editor-container-box");
+      if (textarea && overlay) {
+        // height = 'auto' 축소 시 일어나는 브라우저의 강제 0 스크롤바 튕김을 막기 위해 현재 스크롤 위치 보존
+        const savedScrollTop = container ? container.scrollTop : 0;
+
+        textarea.style.height = 'auto'; 
+        const scrollHeight = textarea.scrollHeight;
+        textarea.style.height = scrollHeight + 'px';
+        overlay.style.height = scrollHeight + 'px';
+
+        // 계산 직후 본래의 부모 영역 스크롤바 높이를 즉각 재주입하여 감쪽같이 복구
+        if (container) {
+          container.scrollTop = savedScrollTop;
+        }
+      }
+    }
+
+    function scrollCursorIntoView() {
+      const textarea = document.getElementById("document-editor");
+      const container = document.getElementById("editor-container-box");
+      if (!textarea || !container) return;
+
+      const selectionEnd = textarea.selectionEnd;
+      const textUpToCursor = textarea.value.substring(0, selectionEnd);
+      const lines = textUpToCursor.split('\n');
+      const cursorLineIndex = lines.length - 1;
+
+      const style = window.getComputedStyle(textarea);
+      const lineHeight = parseFloat(style.lineHeight) || 22.75;
+      const paddingTop = parseFloat(style.paddingTop) || 20;
+
+      const cursorY = paddingTop + (cursorLineIndex * lineHeight);
+      const containerHeight = container.clientHeight;
+      const scrollTop = container.scrollTop;
+
+      if (cursorY < scrollTop + paddingTop) {
+        container.scrollTop = Math.max(0, cursorY - paddingTop - 10);
+      } else if (cursorY + lineHeight > scrollTop + containerHeight) {
+        container.scrollTop = cursorY + lineHeight - containerHeight + 20;
+      }
+    }
+
+    function handleEditorRealtimeInput(e) {
+      const textarea = document.getElementById("document-editor");
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      const doc = proj.documents[proj.activeDocId];
+      if (!doc) return;
+
+      // [Case 1 개선] 실제 텍스트가 타이핑 및 조합되는 물리적 기입이 일어날 때만 한정적으로 무거운 높이/스크롤 추적을 구동하도록 선별 처리
+      const isEditingTyping = e && (e.type === 'keyup' || e.type === 'input' || e.type === 'keydown' || e.type === 'compositionend');
+
+      doc.content = textarea.value;
+
+      if (isEditingTyping) {
+        expandWikiLinksInTextarea(textarea);
+      }
+      
+      saveStateToCache();
+      renderHighlightOverlay();
+      
+      if (isEditingTyping) {
+        syncEditorHeight();
+        scrollCursorIntoView();
+      }
+    }
+
+    function expandWikiLinksInTextarea(textarea) {
+      const value = textarea.value;
+      const start = textarea.selectionStart;
+      
+      const regex = /\[\[([^\]\n]+)\]\]/g;
+      let match;
+      let newValue = value;
+      let offset = 0;
+      let changed = false;
+
+      while ((match = regex.exec(value)) !== null) {
+        const fullMatch = match[0];
+        const linkContent = match[1];
+
+        const targetId = resolveLink(linkContent);
+        if (targetId) {
+          const proj = appState.projects[appState.activeProjectId];
+          const doc = proj.documents[targetId];
+          const meta = uuidToMetaMap.get(targetId);
+          if (doc && meta) {
+            const correctFormat = `${meta.index}. ${doc.title}`;
+            if (linkContent.trim() !== correctFormat) {
+              const expandedLink = `[[${correctFormat}]]`;
+              const matchStart = match.index + offset;
+              const matchEnd = matchStart + fullMatch.length;
+
+              newValue = newValue.substring(0, matchStart) + expandedLink + newValue.substring(matchEnd);
+              offset += expandedLink.length - fullMatch.length;
+              changed = true;
+            }
+          }
+        }
+      }
+
+      if (changed) {
+        textarea.value = newValue;
+        textarea.selectionStart = textarea.selectionEnd = start + offset;
+      }
+    }
+
+    function escapeHtml(string) {
+      return string
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function renderHighlightOverlay() {
+      const textarea = document.getElementById("document-editor");
+      const overlay = document.getElementById("editor-highlight-overlay");
+      if (!textarea || !overlay) return;
+
+      const text = textarea.value;
+      let html = "";
+      let currentIndex = 0;
+
+      let matches = [];
+
+      const wikiRegex = /\[\[([^\]\n]+)\]\]/g;
+      let match;
+      while ((match = wikiRegex.exec(text)) !== null) {
+        if (match.index >= currentIndex) {
+          matches.push({
+            type: 'wiki',
+            start: match.index,
+            end: wikiRegex.lastIndex,
+            content: match[1],
+            raw: match[0]
+          });
+        }
+      }
+
+      const inlineColorRegex = /\$([rgbypocmwlaketivdsfhnuxz123456789])([^$\n]+)\$/g;
+      while ((match = inlineColorRegex.exec(text)) !== null) {
+        if (match.index >= currentIndex) {
+          matches.push({
+            type: 'inlineColor',
+            start: match.index,
+            end: inlineColorRegex.lastIndex,
+            color: match[1],
+            content: match[2],
+            raw: match[0]
+          });
+        }
+      }
+
+      const lineStartRegex = /(?:^|\n)(\$([rgbypocmwlaketivdsfhnuxz123456789])\s+([^\n]*))/g;
+      while ((match = lineStartRegex.exec(text)) !== null) {
+        const matchRaw = match[1];
+        const matchStart = match.index + (match[0].startsWith('\n') ? 1 : 0);
+        const matchEnd = matchStart + matchRaw.length;
+        if (matchStart >= currentIndex) {
+          matches.push({
+            type: 'lineColor',
+            start: matchStart,
+            end: matchEnd,
+            color: match[2],
+            content: match[3],
+            raw: matchRaw
+          });
+        }
+      }
+
+      const commentRegex = /(?:^|\s)\/\/[^\n]*/g;
+      while ((match = commentRegex.exec(text)) !== null) {
+        if (match.index >= currentIndex) {
+          matches.push({
+            type: 'comment',
+            start: match.index,
+            end: commentRegex.lastIndex,
+            content: match[0],
+            raw: match[0]
+          });
+        }
+      }
+
+      matches.sort((a, b) => a.start - b.start);
+      let filteredMatches = [];
+      let lastEnd = currentIndex;
+      for (let m of matches) {
+        if (m.start >= lastEnd) {
+          filteredMatches.push(m);
+          lastEnd = m.end;
+        }
+      }
+
+      for (let m of filteredMatches) {
+        if (m.start > currentIndex) {
+          html += escapeHtml(text.substring(currentIndex, m.start));
+        }
+
+        const escapedContent = escapeHtml(m.content);
+        const escapedRaw = escapeHtml(m.raw);
+
+        if (m.type === 'wiki') {
+          const targetId = resolveLink(m.content);
+          const proj = appState.projects[appState.activeProjectId];
+          if (proj && targetId) {
+            if (targetId === proj.activeDocId) {
+              html += `<span class="code-link-self">${escapedRaw}</span>`;
+            } else {
+              html += `<span class="code-link-valid" data-target-id="${targetId}">${escapedRaw}</span>`;
+            }
+          } else {
+            html += `<span class="code-link-broken">${escapedRaw}</span>`;
+          }
+        } 
+        else if (m.type === 'inlineColor') {
+          const colorHex = colorMap[m.color]?.hex || '#ffffff';
+          html += `<span style="color: rgba(255,255,255,0.18);">$${m.color}</span><span style="color: ${colorHex};">${escapedContent}</span><span style="color: rgba(255,255,255,0.18);">$</span>`;
+        } 
+        else if (m.type === 'lineColor') {
+          const colorHex = colorMap[m.color]?.hex || '#ffffff';
+          html += `<span style="color: rgba(255,255,255,0.18);">$${m.color} </span><span style="color: ${colorHex};">${escapedContent}</span>`;
+        }
+        else if (m.type === 'comment') {
+          html += `<span style="color: #4e5460; font-style: normal;">${escapedRaw}</span>`;
+        }
+
+        currentIndex = m.end;
+      }
+
+      if (currentIndex < text.length) {
+        html += escapeHtml(text.substring(currentIndex));
+      }
+
+      if (html.endsWith('\n')) {
+        html += ' ';
+      }
+
+      overlay.innerHTML = html;
+    }
+
+    function handleEditorKeyDown(e) {
+      const textarea = e.target;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const value = textarea.value;
+
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        
+        const lastNewLine = value.lastIndexOf('\n', start - 1);
+        const lineStart = lastNewLine + 1;
+        const nextNewLine = value.indexOf('\n', start);
+        const lineEnd = nextNewLine === -1 ? value.length : nextNewLine;
+        const currentLine = value.substring(lineStart, lineEnd);
+
+        if (e.shiftKey) {
+          if (currentLine.startsWith('  ')) {
+            const newLine = currentLine.substring(2);
+            textarea.value = value.substring(0, lineStart) + newLine + value.substring(lineEnd);
+            textarea.selectionStart = textarea.selectionEnd = Math.max(lineStart, start - 2);
+          } else if (currentLine.startsWith(' ')) {
+            const newLine = currentLine.substring(1);
+            textarea.value = value.substring(0, lineStart) + newLine + value.substring(lineEnd);
+            textarea.selectionStart = textarea.selectionEnd = Math.max(lineStart, start - 1);
+          } else if (currentLine.startsWith('\t')) {
+            const newLine = currentLine.substring(1);
+            textarea.value = value.substring(0, lineStart) + newLine + value.substring(lineEnd);
+            textarea.selectionStart = textarea.selectionEnd = Math.max(lineStart, start - 1);
+          }
+        } else {
+          const tabSpaces = "  ";
+          textarea.value = value.substring(0, start) + tabSpaces + value.substring(end);
+          textarea.selectionStart = textarea.selectionEnd = start + tabSpaces.length;
+        }
+        handleEditorRealtimeInput(e);
+        return;
+      }
+
+      if (e.key === 'Enter' || e.keyCode === 13) {
+        if (isComposing) return;
+        
+        e.preventDefault();
+
+        const lastNewLine = value.lastIndexOf('\n', start - 1);
+        const lineStart = lastNewLine + 1;
+        const currentLine = value.substring(lineStart, start);
+
+        const indentMatch = currentLine.match(/^([\s\t]*)/);
+        const indent = indentMatch ? indentMatch[1] : '';
+        const insertText = "\n" + indent;
+
+        textarea.value = value.substring(0, start) + insertText + value.substring(end);
+        textarea.selectionStart = textarea.selectionEnd = start + insertText.length;
+        
+        handleEditorRealtimeInput(e);
+        return;
+      }
+
+      if (e.key === 'Backspace' && start === end) {
+        const lastNewLine = value.lastIndexOf('\n', start - 1);
+        const lineStart = lastNewLine + 1;
+        const currentLine = value.substring(lineStart, start);
+
+        const isOnlyIndent = /^[ \t]+$/.test(currentLine);
+
+        if (isOnlyIndent) {
+          e.preventDefault();
+          let newIndent = currentLine;
+          if (currentLine.endsWith('\t')) {
+            newIndent = currentLine.slice(0, -1);
+          } else if (currentLine.endsWith('  ')) {
+            newIndent = currentLine.slice(0, -2);
+          } else {
+            newIndent = currentLine.slice(0, -1);
+          }
+          textarea.value = value.substring(0, lineStart) + newIndent + value.substring(start);
+          textarea.selectionStart = textarea.selectionEnd = lineStart + newIndent.length;
+          handleEditorRealtimeInput(e);
+          return;
+        }
+      }
+    }
+
+    function createNodeUnderParent(parentId) {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+
+      const newId = 'doc-' + Math.random().toString(36).substr(2, 9);
+      
+      proj.documents[newId] = {
+        id: newId,
+        title: "새 문서",
+        parentId: parentId,
+        childIds: [],
+        content: ""
+      };
+
+      if (!proj.documents[parentId].childIds) {
+        proj.documents[parentId].childIds = [];
+      }
+      proj.documents[parentId].childIds.push(newId);
+
+      if (!proj.expandedNodes) proj.expandedNodes = [];
+      if (!proj.expandedNodes.includes(parentId)) {
+        proj.expandedNodes.push(parentId);
+      }
+
+      saveStateToCache();
+      rebuildIndexMaps();
+      renderTree();
+      
+      showToast("새 하위 문서가 생성되었습니다.");
+    }
+
+    function createNewDocumentNode() {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      const parentId = proj.activeDocId || "doc-root";
+      createNodeUnderParent(parentId);
+    }
+
+    function deleteDocumentNode(docId) {
+      if (docId === "doc-root") {
+        showToast("루트 문서는 삭제할 수 없습니다.");
+        return;
+      }
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      const doc = proj.documents[docId];
+      if (!doc) return;
+
+      openCustomConfirm("문서 삭제 확인", `"${doc.title}"문서와 하위 문서들이 영구 삭제됩니다. 진행하시겠습니까?`, () => {
+        const oldLinksMap = getCurrentLinksMap();
+        const targetIds = getDescendantIds(docId);
+
+        const parentId = doc.parentId;
+        if (parentId && proj.documents[parentId]) {
+          proj.documents[parentId].childIds = proj.documents[parentId].childIds.filter(id => id !== docId);
+        }
+
+        targetIds.forEach(id => {
+          delete proj.documents[id];
+          proj.expandedNodes = proj.expandedNodes.filter(eId => eId !== id);
+        });
+
+        if (targetIds.includes(proj.activeDocId)) {
+          proj.activeDocId = "doc-root";
+          loadActiveDocument();
+        }
+
+        selectedNodeIds = selectedNodeIds.filter(id => !targetIds.includes(id));
+
+        saveStateToCache();
+        rebuildIndexMaps();
+
+        const newLinksMap = getCurrentLinksMap();
+        const changes = [];
+        for (const dId in oldLinksMap) {
+          if (newLinksMap[dId]) {
+            changes.push({
+              docId: dId,
+              oldLink: oldLinksMap[dId],
+              newLink: newLinksMap[dId]
+            });
+          }
+        }
+        globalBatchSyncWikiLinks(changes);
+
+        renderTree();
+        showToast("문서가 삭제되었습니다.");
+      });
+    }
+
+    function performDelete() {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+
+      if (selectedNodeIds && selectedNodeIds.length > 0) {
+        const targets = selectedNodeIds.filter(id => id !== "doc-root" && proj.documents[id]);
+        if (targets.length === 0) return;
+
+        openCustomConfirm("선택 문서 일괄 삭제", "선택된 문서들이 영구 삭제됩니다. 진행하시겠습니까?", () => {
+          const oldLinksMap = getCurrentLinksMap();
+          let activeDocDeleted = false;
+
+          targets.forEach(docId => {
+            const targetIds = getDescendantIds(docId);
+            const doc = proj.documents[docId];
+            if (!doc) return;
+
+            const parentId = doc.parentId;
+            if (parentId && proj.documents[parentId]) {
+              proj.documents[parentId].childIds = proj.documents[parentId].childIds.filter(id => id !== docId);
+            }
+
+            targetIds.forEach(id => {
+              delete proj.documents[id];
+              proj.expandedNodes = (proj.expandedNodes || []).filter(eId => eId !== id);
+              if (id === proj.activeDocId) {
+                activeDocDeleted = true;
+              }
+            });
+          });
+
+          selectedNodeIds = [];
+
+          if (activeDocDeleted) {
+            proj.activeDocId = "doc-root";
+            loadActiveDocument();
+          }
+
+          saveStateToCache();
+          rebuildIndexMaps();
+
+          const newLinksMap = getCurrentLinksMap();
+          const changes = [];
+          for (const dId in oldLinksMap) {
+            if (newLinksMap[dId]) {
+              changes.push({
+                docId: dId,
+                oldLink: oldLinksMap[dId],
+                newLink: newLinksMap[dId]
+              });
+            }
+          }
+          globalBatchSyncWikiLinks(changes);
+
+          renderTree();
+          showToast("선택된 문서들이 영구 삭제되었습니다.");
+        });
+      } 
+      else {
+        const currentId = proj.activeDocId;
+        if (currentId === "doc-root") {
+          showToast("루트 문서는 삭제할 수 없습니다.");
+          return;
+        }
+        const doc = proj.documents[currentId];
+        if (!doc) return;
+
+        openCustomConfirm("현재 문서 삭제 확인", `"${doc.title}"문서와 하위 문서들이 영구 삭제됩니다. 진행하시겠습니까?`, () => {
+          const oldLinksMap = getCurrentLinksMap();
+          const targetIds = getDescendantIds(currentId);
+
+          const parentId = doc.parentId;
+          if (parentId && proj.documents[parentId]) {
+            proj.documents[parentId].childIds = proj.documents[parentId].childIds.filter(id => id !== currentId);
+          }
+
+          targetIds.forEach(id => {
+            delete proj.documents[id];
+            proj.expandedNodes = (proj.expandedNodes || []).filter(eId => eId !== id);
+          });
+
+          proj.activeDocId = "doc-root";
+          selectedNodeIds = [];
+
+          loadActiveDocument();
+          saveStateToCache();
+          rebuildIndexMaps();
+
+          const newLinksMap = getCurrentLinksMap();
+          const changes = [];
+          for (const dId in oldLinksMap) {
+            if (newLinksMap[dId]) {
+              changes.push({
+                docId: dId,
+                oldLink: oldLinksMap[dId],
+                newLink: newLinksMap[dId]
+              });
+            }
+          }
+          globalBatchSyncWikiLinks(changes);
+
+          renderTree();
+          showToast("문서가 삭제되었습니다.");
+        });
+      }
+    }
+
+    function manualBackupTrigger() {
+      saveCurrentDocContent();
+      saveCurrentDocTitle();
+      showToast("로컬 프로젝트 캐시 저장 완료");
+    }
+
+    function togglePanel(side) {
+      const el = document.getElementById('panel-left');
+      if (el && side === 'left') {
+        el.style.display = el.style.display === "none" ? "flex" : "none";
+        setTimeout(adjustTreeContainerPadding, 50);
+      }
+    }
+
+    function applyTextPreferences() {
+      const family = document.getElementById("pref-font-family").value;
+      const size = document.getElementById("pref-font-size").value;
+      const editor = document.getElementById("document-editor");
+      const overlay = document.getElementById("editor-highlight-overlay");
+      if (editor && overlay) {
+        editor.style.fontFamily = overlay.style.fontFamily = family + ", monospace";
+        editor.style.fontSize = overlay.style.fontSize = size + "px";
+        editor.style.lineHeight = overlay.style.lineHeight = "1.625";
+        syncEditorHeight();
+      }
+    }
+
+    function applySpellcheckState() {
+      const textarea = document.getElementById("document-editor");
+      if (textarea) {
+        textarea.setAttribute("spellcheck", appState.spellcheckActive ? "true" : "false");
+      }
+      const btn = document.getElementById("menu-view-spellcheck");
+      if (btn) {
+        btn.innerHTML = (appState.spellcheckActive ? "✓ " : "") + "맞춤법 검사 활성화";
+      }
+    }
+
+    function toggleSpellcheck() {
+      appState.spellcheckActive = !appState.spellcheckActive;
+      applySpellcheckState();
+      saveStateToCache();
+      showToast(appState.spellcheckActive ? "맞춤법 검사 활성화" : "맞춤법 검사 비활성화");
+    }
+
+    // 문서 불러오기 메커니즘
+    // [Case 3] 역링크 소스 복구용 scrollToOffset 매개변수 도입
+    function loadActiveDocument(scrollToOffset = null) {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      const doc = proj.documents[proj.activeDocId];
+      if (!doc) return;
+
+      document.getElementById("document-title-input").value = doc.title;
+      
+      let docContent = doc.content || "";
+      docContent = docContent.replace(/\t/g, "  ");
+      
+      const textarea = document.getElementById("document-editor");
+      textarea.value = docContent;
+
+      applySpellcheckState();
+      applyTextPreferences();
+      renderHighlightOverlay();
+      syncEditorHeight();
+      updateBreadcrumbs();
+      updateMenuToggleIndicators();
+
+      // [Case 1 & Case 3] 스크롤 컨테이너 복구 및 정렬 프로세스
+      const container = document.getElementById("editor-container-box");
+      if (container && textarea) {
+        const docId = proj.activeDocId;
+
+        if (scrollToOffset && typeof scrollToOffset === 'object' && typeof scrollToOffset.charIndex === 'number') {
+          // [Case 3 완결 개정] 전달받은 고유 역링크 절대 문자 인덱스로 정확하게 지목
+          const targetCharIndex = scrollToOffset.charIndex;
+          const linkLength = scrollToOffset.length || 0;
+          const text = textarea.value;
+
+          if (targetCharIndex >= 0 && targetCharIndex < text.length) {
+            const textUpToChar = text.substring(0, targetCharIndex);
+            const lineIndex = textUpToChar.split('\n').length - 1;
+
+            const style = window.getComputedStyle(textarea);
+            const lineHeight = parseFloat(style.lineHeight) || 22.75;
+            const paddingTop = parseFloat(style.paddingTop) || 20;
+
+            const lineY = paddingTop + (lineIndex * lineHeight);
+
+            // 해당 역링크 지점을 즉시 정확하게 하이라이트 지목 표시
+            textarea.selectionStart = targetCharIndex;
+            textarea.selectionEnd = Math.min(text.length, targetCharIndex + linkLength);
+            textarea.focus();
+
+            // [Case 3] 브라우저 드로잉 레이아웃 및 폰트 수치가 완전히 자리를 잡은 50ms 후 정중앙 스크롤 안착 처리
+            setTimeout(() => {
+              const containerHeight = container.clientHeight || 500;
+              const targetScrollTop = lineY - (containerHeight / 2) + (lineHeight / 2);
+              container.scrollTop = Math.max(0, targetScrollTop);
+              
+              // 현재 스크롤 높이를 기록 필드에 동기화
+              if (!appState.scrollPositions) appState.scrollPositions = {};
+              appState.scrollPositions[docId] = container.scrollTop;
+              saveStateToCache();
+            }, 50);
+          } else {
+            const savedScroll = (appState.scrollPositions && appState.scrollPositions[docId]) || 0;
+            container.scrollTop = savedScroll;
+          }
+        } else {
+          // [Case 1] 마지막으로 머물렀던 스크롤 좌표 복원
+          const savedScroll = (appState.scrollPositions && appState.scrollPositions[docId]) || 0;
+          container.scrollTop = savedScroll;
+        }
+      }
+    }
+
+    function toggleMetaOption(type) {
+      if (type === 'backlinks') {
+        appState.showTopBacklinks = (appState.showTopBacklinks === false) ? true : false;
+      }
+      saveStateToCache();
+      loadActiveDocument(); 
+    }
+
+    function updateMenuToggleIndicators() {
+      const backlinksMenuBtn = document.getElementById("menu-opt-backlinks");
+      if (backlinksMenuBtn) {
+        backlinksMenuBtn.innerHTML = ((appState.showTopBacklinks !== false) ? "✓ " : "") + "역링크 표시";
+      }
+    }
+
+    // 정밀 텍스트 클립보드 복사 유틸리티 함수
+    function copyTextToClipboard(text) {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      
+      textArea.style.top = "0";
+      textArea.style.left = "0";
+      textArea.style.position = "fixed";
+      
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      try {
+        document.execCommand('copy');
+        showToast("클립보드 복사가 정상 완료되었습니다.");
+      } catch (err) {
+        showToast("클립보드 접근에 실패했습니다: " + err);
+      }
+      
+      document.body.removeChild(textArea);
+    }
+
+    // 불필요한 라벨(수식어)을 걷어내고 지정된 규격으로 깔끔하게 복사되도록 변경
+    function copyDocumentToClipboard() {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      const activeDoc = proj.documents[proj.activeDocId];
+      if (!activeDoc) return;
+
+      let path = [];
+      let currentId = proj.activeDocId;
+      while (currentId) {
+        const doc = proj.documents[currentId];
+        if (doc) {
+          path.unshift(doc);
+          currentId = doc.parentId;
+        } else {
+          break;
+        }
+      }
+
+      // 0.새프로젝트>>1.새문서 포맷 구현
+      const pathStr = path.map(d => {
+        const meta = uuidToMetaMap.get(d.id);
+        if (d.id === "doc-root") return d.title;
+        const indexStr = meta ? meta.index : "";
+        return `${indexStr ? indexStr + "." : ""}${d.title}`;
+      }).join(">>");
+
+      const formattedText = `${activeDoc.title}
+${pathStr}
+${activeDoc.content || ""}`;
+
+      copyTextToClipboard(formattedText);
+    }
+
+    // 브레드크럼 바 갱신 (넘어옴 회색 피팅 + 최대 3개 축소 로직 수용)
+    function updateBreadcrumbs() {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+
+      let path = [];
+      let currentId = proj.activeDocId;
+      while (currentId) {
+        const doc = proj.documents[currentId];
+        if (doc) {
+          path.unshift(doc);
+          currentId = doc.parentId;
+        } else {
+          break;
+        }
+      }
+
+      const bar = document.getElementById("editor-breadcrumbs-bar");
+      if (bar) {
+        bar.innerHTML = "";
+        
+        // [Case 2] 건너옴 문구 클릭 이동 시 반복 무한 루프 생성 방지 (fromDocId 매개변수를 null 전달)
+        if (appState.showTopBacklinks !== false && appState.navigatedFromDocId) {
+          const navDoc = proj.documents[appState.navigatedFromDocId];
+          if (navDoc) {
+            const meta = uuidToMetaMap.get(appState.navigatedFromDocId);
+            const navTitle = `${meta && meta.index !== "0" ? meta.index + ". " : ""}${navDoc.title}`;
+
+            const histSpan = document.createElement("span");
+            histSpan.className = "breadcrumb-history";
+            histSpan.innerText = `↩ ${navTitle}에서 건너옴`;
+            // 복귀할 때는 navigatedFromDocId를 무효화(null)하여 반복 생성 방지
+            histSpan.onclick = () => selectDocument(appState.navigatedFromDocId, null);
+            bar.appendChild(histSpan);
+
+            const divider = document.createElement("span");
+            divider.className = "breadcrumb-separator";
+            divider.innerText = " | ";
+            bar.appendChild(divider);
+          }
+        }
+
+        // 최대 3개 초과시 ... 압축 로직
+        let visiblePath = [...path];
+        let isCollapsed = false;
+
+        if (visiblePath.length > 3) {
+          visiblePath = visiblePath.slice(visiblePath.length - 3);
+          isCollapsed = true;
+        }
+
+        if (isCollapsed) {
+          const ellipsisSpan = document.createElement("span");
+          ellipsisSpan.className = "breadcrumb-segment";
+          ellipsisSpan.style.cursor = "default";
+          ellipsisSpan.innerText = "...";
+          bar.appendChild(ellipsisSpan);
+
+          const sep = document.createElement("span");
+          sep.className = "breadcrumb-separator";
+          sep.innerText = " > ";
+          bar.appendChild(sep);
+        }
+
+        visiblePath.forEach((doc, idx) => {
+          const meta = uuidToMetaMap.get(doc.id);
+          const indexStr = meta && meta.index !== "0" ? meta.index + ". " : "";
+          const segmentText = `${indexStr}${doc.title}`;
+
+          if (idx === visiblePath.length - 1) {
+            const activeSpan = document.createElement("span");
+            activeSpan.className = "breadcrumb-active";
+            activeSpan.innerText = segmentText;
+            bar.appendChild(activeSpan);
+          } else {
+            const linkSpan = document.createElement("span");
+            linkSpan.className = "breadcrumb-segment";
+            linkSpan.innerText = segmentText;
+            linkSpan.onclick = () => selectDocument(doc.id, proj.activeDocId);
+            bar.appendChild(linkSpan);
+
+            const sep = document.createElement("span");
+            sep.className = "breadcrumb-separator";
+            sep.innerText = " > ";
+            bar.appendChild(sep);
+          }
+        });
+      }
+    }
+
+    function goBackToLauncher() {
+      saveCurrentDocContent();
+      document.getElementById("workspace-container").style.visibility = "hidden";
+      document.getElementById("launcher-container").style.display = "flex";
+      launcherSelectedProjectId = appState.activeProjectId;
+      renderProjectLauncher();
+      selectLauncherProjectDetails(launcherSelectedProjectId);
+    }
+
+    function triggerProjectImport() {
+      document.getElementById("project-import-file-input").click();
+    }
+
+    function handleProjectImport(input) {
+      if (!input.files || !input.files[0]) return;
+      const file = input.files[0];
+      const filename = file.name;
+      const extension = filename.split('.').pop().toLowerCase();
+
+      showToast("패키지 파일 검증 중...");
+
+      if (extension === 'zip' || extension === '7z') {
+        if (typeof JSZip === 'undefined') {
+          openCustomConfirm("가져오기 실패", "가져오기 엔진 호출 실패", () => {});
+          input.value = "";
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+          try {
+            const zip = await JSZip.loadAsync(e.target.result);
+            const mdFiles = [];
+            
+            for (const [relativePath, fileInfo] of Object.entries(zip.files)) {
+              if (fileInfo.dir || !relativePath.endsWith('.md')) continue;
+              
+              const fname = relativePath.split('/').pop();
+              const match = fname.match(/^([0-9]+(?:\.[0-9]+)*)\.?\s*(.*?)\.md$/);
+              if (match) {
+                const indexStr = match[1];
+                const title = match[2];
+                const content = await fileInfo.async("text");
+                mdFiles.push({ indexStr, title, content });
+              }
+            }
+
+            if (mdFiles.length === 0) {
+              openCustomConfirm("가져오기 실패", "해당 형식은 지원하지 않습니다.", () => {});
+              input.value = "";
+              return;
+            }
+
+            importProjectFromParsedArray(mdFiles);
+          } catch (err) {
+            console.error(err);
+            openCustomConfirm("가져오기 실패", "해당 형식은 지원하지 않습니다.", () => {});
+          }
+          input.value = "";
+        };
+        reader.readAsArrayBuffer(file);
+      } 
+      else if (extension === 'txt') {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            const fileContent = e.target.result;
+            
+            if (!fileContent.includes("[통합본]")) {
+              openCustomConfirm("가져오기 실패", "해당 형식은 지원하지 않습니다.", () => {});
+              input.value = "";
+              return;
+            }
+
+            let projName = "가져온 프로젝트";
+            const projNameMatch = fileContent.match(/\[통합본\]\s*(.*?)\s*기획 문서 목록/);
+            if (projNameMatch) {
+              projName = projNameMatch[1].trim();
+            }
+
+            const headerRegex = /^(0|[1-9]\d*(?:\.[0-9]+)*)\.?\s*([^\n]+)\r?\n-{10,}\r?\n/gm;
+            const matches = [];
+            let match;
+            while ((match = headerRegex.exec(fileContent)) !== null) {
+              matches.push({
+                index: match.index,
+                indexStr: match[1],
+                title: match[2].trim(),
+                headerLength: match[0].length
+              });
+            }
+
+            if (matches.length === 0) {
+              openCustomConfirm("가져오기 실패", "해당 형식은 지원하지 않습니다.", () => {});
+              input.value = "";
+              return;
+            }
+
+            const mdFiles = [];
+            for (let i = 0; i < matches.length; i++) {
+              const current = matches[i];
+              const nextIndex = (i + 1 < matches.length) ? matches[i + 1].index : fileContent.length;
+              const contentStart = current.index + current.headerLength;
+              let docContent = fileContent.substring(contentStart, nextIndex);
+              
+              docContent = docContent.replace(/\r?\n\r?\n$/, '');
+              mdFiles.push({
+                indexStr: current.indexStr,
+                title: current.title,
+                content: docContent.trim()
+              });
+            }
+
+            importProjectFromParsedArray(mdFiles, projName);
+          } catch (err) {
+            console.error(err);
+            openCustomConfirm("가져오기 실패", "해당 형식은 지원하지 않습니다.", () => {});
+          }
+          input.value = "";
+        };
+        reader.readAsText(file);
+      } 
+      else {
+        openCustomConfirm("가져오기 실패", "해당 형식은 지원하지 않습니다.", () => {});
+        input.value = "";
+      }
+    }
+
+    function importProjectFromParsedArray(mdFiles, overrideProjName) {
+      mdFiles.sort((a, b) => {
+        const aParts = a.indexStr.split('.').map(Number);
+        const bParts = b.indexStr.split('.').map(Number);
+        const minLen = Math.min(aParts.length, bParts.length);
+        for (let i = 0; i < minLen; i++) {
+          if (aParts[i] !== bParts[i]) return aParts[i] - bParts[i];
+        }
+        return aParts.length - bParts.length;
+      });
+
+      const projId = 'proj-' + Math.random().toString(36).substr(2, 9);
+      let projName = overrideProjName || "가져온 프로젝트";
+      const documents = {};
+      const indexToDocId = {};
+
+      const rootItem = mdFiles.find(item => item.indexStr === "0");
+      if (rootItem) {
+        if (!overrideProjName) {
+          projName = rootItem.title;
+        }
+        documents["doc-root"] = {
+          id: "doc-root",
+          title: projName,
+          parentId: null,
+          childIds: [],
+          content: rootItem.content
+        };
+        indexToDocId["0"] = "doc-root";
+      } else {
+        documents["doc-root"] = {
+          id: "doc-root",
+          title: projName,
+          parentId: null,
+          childIds: [],
+          content: ""
+        };
+        indexToDocId["0"] = "doc-root";
+      }
+
+      mdFiles.forEach(item => {
+        if (item.indexStr === "0") return;
+        
+        const currentId = 'doc-' + Math.random().toString(36).substr(2, 9);
+        indexToDocId[item.indexStr] = currentId;
+
+        documents[currentId] = {
+          id: currentId,
+          title: item.title,
+          parentId: null,
+          childIds: [],
+          content: item.content
+        };
+      });
+
+      mdFiles.forEach(item => {
+        if (item.indexStr === "0") return;
+        
+        const currentId = indexToDocId[item.indexStr];
+        const lastDotIdx = item.indexStr.lastIndexOf('.');
+        const parentIndexStr = lastDotIdx === -1 ? "0" : item.indexStr.substring(0, lastDotIdx);
+        const parentId = indexToDocId[parentIndexStr];
+
+        if (parentId && documents[parentId]) {
+          documents[currentId].parentId = parentId;
+          documents[parentId].childIds.push(currentId);
+        } else {
+          documents[currentId].parentId = "doc-root";
+          documents["doc-root"].childIds.push(currentId);
+        }
+      });
+
+      appState.projects[projId] = {
+        id: projId,
+        name: projName,
+        activeDocId: "doc-root",
+        expandedNodes: ["doc-root"],
+        documents: documents
+      };
+      
+      appState.activeProjectId = projId;
+      saveStateToCache();
+
+      launcherSelectedProjectId = projId;
+      
+      enterWorkspace(projId);
+      showToast("가져온 프로젝트를 자동으로 열었습니다!");
+    }
+
+    function openMergeFileDialog() {
+      document.getElementById("merge-file-input").click();
+    }
+
+    function processFileMerge(input) {
+      if (!input.files || !input.files[0]) return;
+      const file = input.files[0];
+      const reader = new FileReader();
+
+      reader.onload = function(e) {
+        const textToMerge = e.target.result;
+        const textarea = document.getElementById("document-editor");
+        if (textarea) {
+          const currentText = textarea.value;
+          const mergedText = currentText + (currentText ? "\n\n" : "") + textToMerge;
+          textarea.value = mergedText;
+          
+          handleEditorRealtimeInput({ target: textarea });
+          showToast(`"${file.name}" 내용 병합 완료!`);
+        }
+        input.value = "";
+      };
+      reader.readAsText(file);
+    }
+
+    function showToast(message) {
+      const toast = document.getElementById("toast-notice");
+      if (toast) {
+        toast.innerText = message;
+        toast.classList.add("show");
+        setTimeout(() => toast.classList.remove("show"), 2000);
+      }
+    }
+
+    function initResizerPanel() {
+      const resizerLeft = document.getElementById("resizer-left");
+      const sidebarLeft = document.getElementById("panel-left");
+
+      if (resizerLeft && sidebarLeft) {
+        resizerLeft.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          resizerLeft.classList.add("dragging");
+          function onMouseMove(moveEvent) {
+            const newWidth = moveEvent.clientX;
+            if (newWidth > 150 && newWidth < 600) {
+              sidebarLeft.style.width = newWidth + "px";
+            }
+          }
+          function onMouseUp() {
+            resizerLeft.classList.remove("dragging");
+            document.removeEventListener("mousemove", onMouseMove);
+            document.removeEventListener("mouseup", onMouseUp);
+          }
+          document.addEventListener("mousemove", onMouseMove);
+          document.addEventListener("mouseup", onMouseUp);
+        });
+      }
+    }
+
+    function showQuickLinkModal() {
+      const modal = document.getElementById("quick-link-backdrop");
+      const searchInput = document.getElementById("quick-link-search");
+      searchInput.value = "";
+      selectedQuickPickIndex = 0;
+      modal.classList.add("show");
+      searchInput.focus();
+      
+      renderQuickLinkList("");
+    }
+
+    function closeQuickLinkModal() {
+      const modal = document.getElementById("quick-link-backdrop");
+      modal.classList.remove("show");
+      document.getElementById("document-editor").focus();
+    }
+
+    function renderQuickLinkList(filterText) {
+      const container = document.getElementById("quick-link-list");
+      container.innerHTML = "";
+      
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      
+      const query = filterText.toLowerCase().trim();
+      const items = [];
+      
+      for (const docId in proj.documents) {
+        const doc = proj.documents[docId];
+        const meta = uuidToMetaMap.get(docId) || { index: "", title: doc.title };
+        const label = `${meta.index}. ${doc.title}`;
+        
+        if (query === "" || label.toLowerCase().includes(query)) {
+          items.push({ id: docId, label: label, doc: doc, meta: meta });
+        }
+      }
+      
+      if (items.length === 0) {
+        container.innerHTML = '<div style="font-size:11px; color:#858585; text-align:center; padding:12px 0;">결과 없음</div>';
+        return;
+      }
+      
+      items.forEach((item, idx) => {
+        const row = document.createElement("div");
+        row.className = "quick-pick-item" + (idx === selectedQuickPickIndex ? " selected" : "");
+        row.onclick = () => {
+          insertQuickLink(item.id);
+        };
+        row.innerHTML = `
+          <span>${item.label}</span>
+          <span style="font-size: 10px; color: #858585;">[[${item.meta.index}. ${item.doc.title}]]</span>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function filterQuickLinks() {
+      const searchInput = document.getElementById("quick-link-search");
+      selectedQuickPickIndex = 0;
+      renderQuickLinkList(searchInput.value);
+    }
+
+    document.getElementById("quick-link-search").addEventListener("keydown", function(e) {
+      const listContainer = document.getElementById("quick-link-list");
+      const items = listContainer.querySelectorAll(".quick-pick-item");
+      
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (items.length > 0) {
+          items[selectedQuickPickIndex].classList.remove("selected");
+          selectedQuickPickIndex = (selectedQuickPickIndex + 1) % items.length;
+          items[selectedQuickPickIndex].classList.add("selected");
+          items[selectedQuickPickIndex].scrollIntoView({ block: "nearest" });
+        }
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (items.length > 0) {
+          items[selectedQuickPickIndex].classList.remove("selected");
+          selectedQuickPickIndex = (selectedQuickPickIndex - 1 + items.length) % items.length;
+          items[selectedQuickPickIndex].classList.add("selected");
+          items[selectedQuickPickIndex].scrollIntoView({ block: "nearest" });
+        }
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (items.length > 0 && items[selectedQuickPickIndex]) {
+          items[selectedQuickPickIndex].click();
+        }
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        closeQuickLinkModal();
+      }
+    });
+
+    function insertQuickLink(targetDocId) {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+      const targetDoc = proj.documents[targetDocId];
+      if (!targetDoc) return;
+      
+      const meta = uuidToMetaMap.get(targetDocId);
+      const indexStr = meta ? meta.index : "";
+      const linkText = `[[${indexStr ? indexStr + ". " : ""}${targetDoc.title}]]`;
+      
+      const textarea = document.getElementById("document-editor");
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const text = textarea.value;
+      
+      textarea.value = text.substring(0, start) + linkText + text.substring(end);
+      textarea.selectionStart = textarea.selectionEnd = start + linkText.length;
+      
+      closeQuickLinkModal();
+      handleEditorRealtimeInput({ target: textarea });
+    }
+
+    function renderColorPaletteGrid() {
+      const grid = document.getElementById("color-palette-grid");
+      if (!grid) return;
+      grid.innerHTML = "";
+
+      Object.entries(colorMap).forEach(([char, info]) => {
+        const card = document.createElement("div");
+        card.className = "color-pick-card";
+        card.setAttribute("data-char", char);
+        card.onclick = () => applySelectedColor(char);
+
+        card.innerHTML = `
+          <div class="color-pick-indicator" style="background-color: ${info.hex}; box-shadow: 0 0 4px ${info.hex}80;"></div>
+          <span class="color-pick-text">${info.name}</span>
+          <span class="color-pick-badge" style="background-color: #2b2b2b; color: #fff; border: 1px solid #444;">${char.toUpperCase()}</span>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function showColorPaletteModal() {
+      const textarea = document.getElementById("document-editor");
+      if (!textarea) return;
+
+      selectionBackup.start = textarea.selectionStart;
+      selectionBackup.end = textarea.selectionEnd;
+
+      const modal = document.getElementById("color-palette-backdrop");
+      modal.classList.add("show");
+
+      const cards = document.querySelectorAll(".color-pick-card");
+      cards.forEach(c => c.classList.remove("focused"));
+      if (cards[0]) cards[0].classList.add("focused");
+    }
+
+    function closeColorPaletteModal() {
+      const modal = document.getElementById("color-palette-backdrop");
+      modal.classList.remove("show");
+      document.getElementById("document-editor").focus();
+    }
+
+    function applySelectedColor(colorChar) {
+      const textarea = document.getElementById("document-editor");
+      if (!textarea) return;
+
+      const start = selectionBackup.start;
+      const end = selectionBackup.end;
+      const text = textarea.value;
+      const selectedText = text.substring(start, end);
+
+      const wrapped = `$${colorChar}${selectedText}$`;
+      textarea.value = text.substring(0, start) + wrapped + text.substring(end);
+
+      if (start === end) {
+        textarea.selectionStart = textarea.selectionEnd = start + 2;
+      } else {
+        textarea.selectionStart = start;
+        textarea.selectionEnd = start + wrapped.length;
+      }
+
+      closeColorPaletteModal();
+      handleEditorRealtimeInput({ target: textarea });
+      showToast(`'${colorMap[colorChar]?.name || "Color"}' 강조 스타일이 적용되었습니다.`);
+    }
+
+    window.addEventListener("keydown", function(e) {
+      const palette = document.getElementById("color-palette-backdrop");
+      if (palette && palette.classList.contains("show")) {
+        const key = e.key.toLowerCase();
+        if (e.key === "Escape") {
+          e.preventDefault();
+          closeColorPaletteModal();
+          return;
+        }
+        if (colorMap[key]) {
+          e.preventDefault();
+          applySelectedColor(key);
+        }
+      }
+
+      const backlinksModal = document.getElementById("backlinks-backdrop");
+      if (backlinksModal && backlinksModal.classList.contains("show")) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          closeBacklinksModal();
+        }
+      }
+    });
+
+    // [Case 3 완결 조율] 가상 탭공백 동기화 변환 처리를 거쳐 중복된 역링크 지점의 절대적인 위치 구조를 전부 개별 색인
+    function findBacklinksWithContext(targetDocId) {
+      const proj = appState.projects[appState.activeProjectId];
+      const backlinks = [];
+      if (!proj) return backlinks;
+
+      const targetDoc = proj.documents[targetDocId];
+      if (!targetDoc) return backlinks;
+
+      for (const docId in proj.documents) {
+        if (docId === targetDocId) continue; 
+
+        const doc = proj.documents[docId];
+        if (!doc.content) continue;
+
+        // 탭 공백 변환 처리를 미리 수행하여 문자 인덱스의 일관성을 확보
+        const content = doc.content.replace(/\t/g, "  ");
+        const wikiRegex = /\[\[([^\]\n]+)\]\]/g;
+        let match;
+        
+        while ((match = wikiRegex.exec(content)) !== null) {
+          const linkContent = match[1];
+          const resolvedId = resolveLink(linkContent);
+          
+          let isMatch = (resolvedId === targetDocId);
+          // 차선 대칭 타이틀 추적 처리 작동
+          if (!isMatch && targetDoc.title) {
+            const trimmedLink = linkContent.trim();
+            if (trimmedLink === targetDoc.title || trimmedLink.endsWith(". " + targetDoc.title) || trimmedLink.endsWith("." + targetDoc.title)) {
+              isMatch = true;
+            }
+          }
+
+          if (isMatch) {
+            const linkStartIdx = match.index;
+            const linkEndIdx = wikiRegex.lastIndex;
+            
+            // 줄 단위 기점 분기 슬라이스 검사
+            const lastNewline = content.lastIndexOf('\n', linkStartIdx);
+            const lineStart = lastNewline === -1 ? 0 : lastNewline + 1;
+            
+            const nextNewline = content.indexOf('\n', linkEndIdx);
+            const lineEnd = nextNewline === -1 ? content.length : nextNewline;
+            
+            const line = content.substring(lineStart, lineEnd);
+            
+            const localStart = linkStartIdx - lineStart;
+            const localEnd = linkEndIdx - lineStart;
+            
+            let beforeText = line.substring(Math.max(0, localStart - 35), localStart);
+            if (localStart > 35) beforeText = "..." + beforeText;
+            
+            let afterText = line.substring(localEnd, Math.min(line.length, localEnd + 35));
+            if (localEnd + 35 < line.length) afterText = afterText + "...";
+
+            const contextPreview = `${beforeText} <span style="color:#52a9ff; font-weight:bold; border-bottom: 1.5px dashed #52a9ff;">[[${linkContent}]]</span> ${afterText}`;
+
+            const meta = uuidToMetaMap.get(docId) || { index: "", title: doc.title };
+            backlinks.push({
+              id: docId,
+              index: meta.index,
+              title: doc.title,
+              context: contextPreview.trim(),
+              // 고유 지점을 정확하게 찾아가도록 절대 문자 오프셋 및 물리적 길이를 저장
+              absoluteCharIndex: linkStartIdx,
+              linkLength: match[0].length
+            });
+          }
+        }
+      }
+      return backlinks;
+    }
+
+    function showBacklinksModal(docId) {
+      const proj = appState.projects[appState.activeProjectId];
+      if (!proj) return;
+
+      const targetId = docId || proj.activeDocId;
+      const targetDoc = proj.documents[targetId];
+      if (!targetDoc) return;
+
+      const meta = uuidToMetaMap.get(targetId) || { index: "0", title: targetDoc.title };
+      const titleLabel = targetId === "doc-root" ? targetDoc.title : `${meta.index}. ${targetDoc.title}`;
+
+      const titleEl = document.getElementById("backlinks-modal-title");
+      if (titleEl) {
+        titleEl.innerText = `"${titleLabel}" 역링크 목록`;
+      }
+
+      const container = document.getElementById("backlinks-list");
+      if (!container) return;
+      container.innerHTML = "";
+
+      const links = findBacklinksWithContext(targetId);
+
+      if (links.length === 0) {
+        container.innerHTML = `
+          <div style="font-size: 11.5px; color: #858585; text-align: center; padding: 36px 0; line-height: 1.7;">
+            이 문서를 가리키는 역링크가 아직 존재하지 않습니다.<br>
+            <span style="font-size: 10px; color: #555555; margin-top: 6px; display: inline-block;">다른 기획 노트에 [[${targetId === "doc-root" ? targetDoc.title : meta.index + ". " + targetDoc.title}]] 구문을 적어 연결해 보세요.</span>
+          </div>
+        `;
+      } else {
+        links.forEach(item => {
+          const row = document.createElement("div");
+          row.className = "quick-pick-item";
+          row.style.flexDirection = "column";
+          row.style.alignItems = "stretch";
+          row.style.gap = "6px";
+          row.style.padding = "10px 12px";
+          
+          // [Case 3 완결] 역링크 클릭 시 정확하게 해당 지점으로 포지셔닝되도록 absoluteCharIndex 및 길이를 전달
+          row.onclick = () => {
+            selectDocument(item.id, proj.activeDocId, { charIndex: item.absoluteCharIndex, length: item.linkLength });
+            closeBacklinksModal();
+          };
+
+          row.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+              <span style="font-weight: bold; color: #ffffff; font-size: 11.5px;">${item.index ? item.index + ". " : ""}${item.title}</span>
+              <span style="font-size: 9.5px; color: #0e639c; font-weight: bold; background-color: rgba(14,99,156,0.15); padding: 1px 5px; border-radius: 3px;">이동 ⏎</span>
+            </div>
+            <div class="backlink-context-line" style="font-size: 11px; color: #a0a0a0; font-family: Consolas, monospace; background-color: #1a1a1a; padding: 6px 10px; border-radius: 4px; border: 1px solid #2d2d30; line-height: 1.5; margin-top: 4px;">
+              ${item.context}
+            </div>
+          `;
+          container.appendChild(row);
+        });
+      }
+
+      const modal = document.getElementById("backlinks-backdrop");
+      if (modal) {
+        modal.classList.add("show");
+      }
+    }
+
+    function closeBacklinksModal() {
+      const modal = document.getElementById("backlinks-backdrop");
+      if (modal) {
+        modal.classList.remove("show");
+      }
+      const editor = document.getElementById("document-editor");
+      if (editor) editor.focus();
+    }
+
+    function initShortcuts() {
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'F1') {
+          e.preventDefault();
+          showShortcutModal();
+          return;
+        }
+
+        if (e.key === 'Delete' || e.key === 'Del') {
+          const activeTag = document.activeElement ? document.activeElement.tagName : '';
+          if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA') {
+            e.preventDefault();
+            performDelete();
+            return;
+          }
+        }
+
+        const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+        if (isCmdOrCtrl) {
+          if (e.key.toLowerCase() === 's') {
+            e.preventDefault();
+            manualBackupTrigger();
+          } else if (e.key.toLowerCase() === 'n') {
+            e.preventDefault();
+            createNewDocumentNode();
+          } else if (e.key.toLowerCase() === 'b') {
+            e.preventDefault();
+            togglePanel('left');
+          } else if (e.key.toLowerCase() === 'l') {
+            e.preventDefault();
+            showQuickLinkModal();
+          }
+        }
+        
+        if (e.altKey && e.key.toLowerCase() === 'c') {
+          e.preventDefault();
+          showColorPaletteModal();
+        }
+
+        if (e.altKey && e.key.toLowerCase() === 'b') {
+          e.preventDefault();
+          showBacklinksModal();
+        }
+      });
+    }
+  </script>
+</body>
+</html>
